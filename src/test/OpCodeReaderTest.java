@@ -19,6 +19,7 @@ import reader.Reader.ProcessStatus;
 
 class OpCodeReaderTest {
 	private static final Charset UTF_8 = StandardCharsets.UTF_8;
+	private static final int BUFFER_SIZE = 1024;
 	
 	@Tag("OpCodeReader")
 	@Test
@@ -43,7 +44,7 @@ class OpCodeReaderTest {
 			public void visit(ErrorCodeReader reader, Void Context) {
 			}
 		};
-		ByteBuffer bb = ByteBuffer.allocate(6);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)1)
 			.putShort((short)3)
 			.put(UTF_8.encode("abc"));
@@ -63,6 +64,7 @@ class OpCodeReaderTest {
 
 			@Override
 			public void visit(SendPrivateMessageReader reader, Void Context) {
+				reader.get();
 				throw new NullPointerException();
 			}
 
@@ -73,7 +75,7 @@ class OpCodeReaderTest {
 			public void visit(ErrorCodeReader reader, Void Context) {
 			}
 		};
-		ByteBuffer bb = ByteBuffer.allocate(18);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)2)
 			.putShort((short)3)
 			.put(UTF_8.encode("abc"))
@@ -101,13 +103,14 @@ class OpCodeReaderTest {
 
 			@Override
 			public void visit(SendMessageAllReader reader, Void Context) {
+				reader.get();
 				throw new NullPointerException();
 			}
 			@Override
 			public void visit(ErrorCodeReader reader, Void Context) {
 			}
 		};
-		ByteBuffer bb = ByteBuffer.allocate(13);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)3)
 			.putShort((short)3)
 			.put(UTF_8.encode("abc"))
@@ -136,10 +139,11 @@ class OpCodeReaderTest {
 			}
 			@Override
 			public void visit(ErrorCodeReader reader, Void Context) {
+				reader.get();
 				throw new NullPointerException();
 			}
 		};
-		ByteBuffer bb = ByteBuffer.allocate(2);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)6)
 			.put((byte)1);
 		var OCR = new OpCodeReader();
@@ -150,7 +154,7 @@ class OpCodeReaderTest {
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldThrowIfProcessingWhenDone() {
-		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)6);
 		bb.put((byte)1);
 		var OCR = new OpCodeReader();
@@ -178,7 +182,7 @@ class OpCodeReaderTest {
 			public void visit(ErrorCodeReader reader, Void Context) {
 			}
 		};
-		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)6);
 		bb.put((byte)1);
 		var OCR = new OpCodeReader();
@@ -206,7 +210,7 @@ class OpCodeReaderTest {
 				throw new NullPointerException();
 			}
 		};
-		ByteBuffer bb = ByteBuffer.allocate(4);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)6)
 			.put((byte)1)
 			.put((byte)6)
@@ -222,7 +226,7 @@ class OpCodeReaderTest {
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldReturnErrorWhenUnkownOpCode() {
-		ByteBuffer bb = ByteBuffer.allocate(4);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)27);
 		var OCR = new OpCodeReader();
 		assertEquals(ProcessStatus.ERROR,OCR.process(bb));

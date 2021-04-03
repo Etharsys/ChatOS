@@ -1,10 +1,10 @@
 package reader;
 
 import java.util.Objects;
+import java.util.Optional;
 
 public class Message {
 	private final String sender;
-	//TODO may be null (currently)
 	private final String recipient;
 	private final String message;
 	
@@ -16,8 +16,11 @@ public class Message {
 		this.message = message;
 	}
 	
-	public String getRecipient() {
-		return recipient;
+	public Optional<String> getRecipient() {
+		if (recipient != null) {
+			return Optional.of(recipient);
+		}
+		return Optional.empty();
 	}
 	
 	public String getSender() {

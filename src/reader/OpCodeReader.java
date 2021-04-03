@@ -7,6 +7,11 @@ import java.util.Optional;
 import reader.Reader.ProcessStatus;
 
 public class OpCodeReader{
+	static public final byte CR_CODE = 1;
+	static public final byte SPM_CODE = 2;
+	static public final byte SMA_CODE = 3;
+	static public final byte ERROR_PACKET_CODE = 6;
+	
 	private enum State {DONE,WAITING,ERROR};
 	private State state = State.WAITING;
 	private final ConnectionRequestReader CR = new ConnectionRequestReader();
@@ -17,22 +22,25 @@ public class OpCodeReader{
 	private Optional<DatagramReader<?>> reader = Optional.empty();
 	
 	private ProcessStatus getReader(ByteBuffer bb) {
+		if (bb.position() == 0) {
+			return ProcessStatus.REFILL;
+		}
 		bb.flip();
 		switch(bb.get()) {
-		case 1:
+		case CR_CODE:
 			reader = Optional.of(CR);
 			break;
-		case 2:
+		case SPM_CODE:
 			reader = Optional.of(SPM);
 			break;
-		case 3:
+		case SMA_CODE:
 			reader = Optional.of(SMA);
 			break;
 		case 4:
 			throw new UnsupportedClassVersionError();
 		case 5:
 			throw new UnsupportedClassVersionError();
-		case 6:
+		case ERROR_PACKET_CODE:
 			reader = Optional.of(ERROR);
 			break;
 		default:

@@ -9,24 +9,29 @@ import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.util.LinkedList;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Logger;
 
+import reader.OpCodeReader;
+import reader.Reader.ProcessStatus;
+
 public class ClientChatOs {
-	
-	static private class Context {
+	public class Context {
 		
 		private final SelectionKey key;
 		private final SocketChannel sc;
 		
-		private final int BUFFER_MAX_SIZE = (BUFFER_SIZE + Short.BYTES) * 3 + 1;
+		private final int BUFFER_MAX_SIZE = (MAX_STRING_SIZE + Short.BYTES) * 3 + 1;
 		
 		private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 		
 		private final Queue<ByteBuffer> queue     = new LinkedList<>();;
+		private final OpCodeReader reader = new OpCodeReader();
+		private final ClientDatagramVisitor visitor = new ClientDatagramVisitor();
 		//Reader here !
 		
 		private boolean closed = false;
@@ -45,6 +50,16 @@ public class ClientChatOs {
 		 */
 		private void processIn() {
 			//TODO normalement c'est pas different de ClientChat sauf qu'on a un switch sur le type de message reçu !
+			System.out.println(bbin);
+			for (var ps = reader.process(bbin); ps != ProcessStatus.REFILL; ps = reader.process(bbin)) {
+				if (ps == ProcessStatus.ERROR) {
+					silentlyClose();
+					return;
+				} else {
+					reader.accept(visitor, this);
+					reader.reset();
+				}
+			}
 		}
 		
 		/**
@@ -141,7 +156,7 @@ public class ClientChatOs {
 	
 	/* ----------------------------------------------------------------- */
 	
-	static private int       BUFFER_SIZE = 1_024;
+	static private int       MAX_STRING_SIZE = 1_024;
 	static private Logger    logger      = Logger.getLogger(ClientChatOs.class.getName());
 	static private final int maxLoginLength = 32;
 
@@ -207,6 +222,62 @@ public class ClientChatOs {
 		selector.wakeup();
 		commandQueue.add(command);
 	}
+	/**
+	 * 
+	 * @param message message to encode
+	 * @return an Optional containing the datagram MessageToAll if the message is not too long.
+	 * Optional.empty() otherwise
+	 */
+	private Optional<ByteBuffer> createMessageToAll(String message) {
+		logger.info("adding message to queue : " + message  + " from : "
+				+ login);
+		
+		var bblog = UTF8_CHARSET.encode(login);
+		var bbmsg = UTF8_CHARSET.encode(message);
+		if (bbmsg.limit() > MAX_STRING_SIZE) {
+			logger.info("Message exceed the limit (1024), ignoring command");
+			return Optional.empty();
+		}
+		return Optional.of(ByteBuffer.allocate(1+2*Short.BYTES + bblog.limit() + bbmsg.limit())
+				.put(OpCodeReader.SMA_CODE)
+				.putShort((short)bblog.limit())
+				.put(bblog)
+				.putShort((short)bbmsg.limit())
+				.put(bbmsg));
+	}
+	
+	/**
+	 * 
+	 * @param recipient recipient to send to
+	 * @param message message to encode
+	 * @return an Optional containing the datagram PrivateMessage if the message is not too long.
+	 * Optional.empty() otherwise
+	 */
+	private Optional<ByteBuffer> createMessageToRecipient(String recipient, String message) {
+		logger.info("adding message to queue : " + message  + " from : "
+				+ login +" to : " + recipient);
+		
+		var bblog = UTF8_CHARSET.encode(login);
+		var bbrec = UTF8_CHARSET.encode(recipient);
+		var bbmsg = UTF8_CHARSET.encode(message);
+		
+		if (bbrec.limit() > MAX_STRING_SIZE) {
+			logger.info("Recipient exceed the limit (1024), ignoring command");
+			return Optional.empty();
+		}
+		if (bbmsg.limit() > MAX_STRING_SIZE) {
+			logger.info("Message exceed the limit (1024), ignoring command");
+			return Optional.empty();
+		}
+		return Optional.of(ByteBuffer.allocate(1+3*Short.BYTES + bblog.limit() + bbrec.limit() + bbmsg.limit())
+				.put(OpCodeReader.SPM_CODE)
+				.putShort((short)bblog.limit())
+				.put(bblog)
+				.putShort((short)bbrec.limit())
+				.put(bbrec)
+				.putShort((short)bbmsg.limit())
+				.put(bbmsg));
+	}
 	
 	/**
 	 * @brief process the first command in commandQueue
@@ -215,17 +286,26 @@ public class ClientChatOs {
 		if (commandQueue.isEmpty())
 			return;
 		var command = commandQueue.poll();
-		logger.info("adding to queue : " + command + " (" + command.length() + ") from : "
-				+ login + " (" + login.length() + ") ");
-		var bblog = UTF8_CHARSET.encode(login);
-		var bbcom = UTF8_CHARSET.encode(command);
-		if (bbcom.limit() > BUFFER_SIZE) {
-			logger.info("Message exceed the limit (1024), ignoring command");
-			return;
+		
+		Optional<ByteBuffer> bb;
+		if (!command.startsWith("@") && !command.startsWith("/")) {
+			bb = createMessageToAll(command);
+		} else {
+			if (command.startsWith("@")) {
+				var type = command.split(" ",2);
+				if (type.length != 2) {
+					System.out.println("not enough args");
+				}
+				bb = createMessageToRecipient(type[0].substring(1), type[1]);
+			} else {
+				//TCP le pas beau a faire
+				logger.severe("Not yes implemented");
+				bb = Optional.empty();
+			}
 		}
-		var bb = ByteBuffer.allocate(Integer.BYTES * 2 + bbcom.limit() + bblog.limit());
-		bb.putInt(bblog.limit()).put(bblog).putInt(bbcom.limit()).put(bbcom);
-		uniqueContext.queueCommand(bb);
+		if (bb.isPresent()) {
+			uniqueContext.queueCommand(bb.get());
+		}
 	}
 	
 	/* ----------------------------------------------------------------- */

@@ -3,7 +3,7 @@ package reader;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-public class SendPrivateMessageReader implements Reader<Message>, DatagramReader {
+public class SendPrivateMessageReader implements DatagramReader<Message>{
 	private enum State {DONE,WAITING_SENDER_LOGIN, WAITING_LOGINR, WAITING_MESSAGE,ERROR};
 	
     private State state = State.WAITING_SENDER_LOGIN;
@@ -14,9 +14,9 @@ public class SendPrivateMessageReader implements Reader<Message>, DatagramReader
 
     
 	@Override
-	public void accept(DatagramVisitor visitor) {
+	public <T>void accept(DatagramVisitor<T> visitor, T context) {
 		Objects.requireNonNull(visitor);
-		visitor.visit(this);
+		visitor.visit(this, context);
 	}
     
     @Override

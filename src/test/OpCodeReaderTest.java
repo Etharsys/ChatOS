@@ -3,105 +3,228 @@ package test;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.ByteBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import reader.ConnectionRequestReader;
+import reader.DatagramVisitor;
 import reader.ErrorCodeReader;
 import reader.OpCodeReader;
 import reader.SendMessageAllReader;
 import reader.SendPrivateMessageReader;
+import reader.Reader.ProcessStatus;
 
 class OpCodeReaderTest {
+	private static final Charset UTF_8 = StandardCharsets.UTF_8;
 	
 	@Tag("OpCodeReader")
 	@Test
-	public void OpCodeShouldOnlyReadOneByte() {
-		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
-		bb.put((byte)1);
-		bb.put((byte)1);
+	public void OpCodeShouldContainCRAfterOpCode1() {
+		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+
+			@Override
+			public void visit(ConnectionRequestReader reader, Void Context) {
+				if(reader.get().equals("abc")) {
+					throw new NullPointerException();
+				}
+			}
+
+			@Override
+			public void visit(SendPrivateMessageReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendMessageAllReader reader, Void Context) {
+			}
+			@Override
+			public void visit(ErrorCodeReader reader, Void Context) {
+			}
+		};
+		ByteBuffer bb = ByteBuffer.allocate(6);
+		bb.put((byte)1)
+			.putShort((short)3)
+			.put(UTF_8.encode("abc"));
 		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		assert(bb.position() == 1);
+		assertEquals(ProcessStatus.DONE,OCR.process(bb));
+		assertThrows(NullPointerException.class,()->OCR.accept(visitor, null));
 	}
 	
 	@Tag("OpCodeReader")
 	@Test
-	public void OpCodeShouldReturnCRWhenFacing1() {
-		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
-		bb.put((byte)1);
-		bb.put((byte)1);
+	public void OpCodeShouldContainSPMAfterOpCode2() {
+		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+
+			@Override
+			public void visit(ConnectionRequestReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendPrivateMessageReader reader, Void Context) {
+				throw new NullPointerException();
+			}
+
+			@Override
+			public void visit(SendMessageAllReader reader, Void Context) {
+			}
+			@Override
+			public void visit(ErrorCodeReader reader, Void Context) {
+			}
+		};
+		ByteBuffer bb = ByteBuffer.allocate(18);
+		bb.put((byte)2)
+			.putShort((short)3)
+			.put(UTF_8.encode("abc"))
+			.putShort((short)3)
+			.put(UTF_8.encode("def"))
+			.putShort((short)5)
+			.put(UTF_8.encode("salut"));
 		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		assert(OCR.get() instanceof ConnectionRequestReader);
+		assertEquals(ProcessStatus.DONE,OCR.process(bb));
+		assertThrows(NullPointerException.class, () -> OCR.accept(visitor, null));
 	}
 	
 	@Tag("OpCodeReader")
 	@Test
-	public void OpCodeShouldReturnSPMWhenFacing2() {
-		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
-		bb.put((byte)2);
-		bb.put((byte)1);
+	public void OpCodeShouldContainSMAAfterOpCode3() {
+		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+
+			@Override
+			public void visit(ConnectionRequestReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendPrivateMessageReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendMessageAllReader reader, Void Context) {
+				throw new NullPointerException();
+			}
+			@Override
+			public void visit(ErrorCodeReader reader, Void Context) {
+			}
+		};
+		ByteBuffer bb = ByteBuffer.allocate(13);
+		bb.put((byte)3)
+			.putShort((short)3)
+			.put(UTF_8.encode("abc"))
+			.putShort((short) 5)
+			.put(UTF_8.encode("salut"));
 		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		assert(OCR.get() instanceof SendPrivateMessageReader);
-	}
-	
-	@Tag("OpCodeReader")
-	@Test
-	public void OpCodeShouldReturnSMAWhenFacing3() {
-		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
-		bb.put((byte)3);
-		bb.put((byte)1);
-		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		assert(OCR.get() instanceof SendMessageAllReader);
+		assertEquals(ProcessStatus.DONE,OCR.process(bb));
+		assertThrows(NullPointerException.class, () -> OCR.accept(visitor, null));
 	}
 	
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldReturnERRORWhenFacing6() {
-		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
-		bb.put((byte)6);
-		bb.put((byte)1);
+		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+
+			@Override
+			public void visit(ConnectionRequestReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendPrivateMessageReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendMessageAllReader reader, Void Context) {
+			}
+			@Override
+			public void visit(ErrorCodeReader reader, Void Context) {
+				throw new NullPointerException();
+			}
+		};
+		ByteBuffer bb = ByteBuffer.allocate(2);
+		bb.put((byte)6)
+			.put((byte)1);
 		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		assert(OCR.get() instanceof ErrorCodeReader);
+		assertEquals(ProcessStatus.DONE,OCR.process(bb));
+		assertThrows(NullPointerException.class, () -> OCR.accept(visitor, null));
 	}
 	
 	@Tag("OpCodeReader")
 	@Test
-	public void OpCodeShouldThrowIfUsingTwoTimesInARow() {
+	public void OpCodeShouldThrowIfProcessingWhenDone() {
 		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
 		bb.put((byte)6);
 		bb.put((byte)1);
 		var OCR = new OpCodeReader();
-		OCR.process(bb);
+		assertEquals(ProcessStatus.DONE,OCR.process(bb));
 		assertThrows(IllegalStateException.class, () -> OCR.process(bb));
 	}
 	
 	@Tag("OpCodeReader")
 	@Test
-	public void OpCodeShouldThrowWhenAskingTooEarly() {
+	public void OpCodeShouldThrowWhenAcceptingTooEarly() {
+		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+
+			@Override
+			public void visit(ConnectionRequestReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendPrivateMessageReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendMessageAllReader reader, Void Context) {
+			}
+			@Override
+			public void visit(ErrorCodeReader reader, Void Context) {
+			}
+		};
 		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
 		bb.put((byte)6);
 		bb.put((byte)1);
 		var OCR = new OpCodeReader();
-		assertThrows(IllegalStateException.class, () -> OCR.get());
+		assertThrows(IllegalStateException.class, () -> OCR.accept(visitor,null));
 	}
 	
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldCorrectlyReset() {
-		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
-		bb.put((byte)6);
-		bb.put((byte)1);
+		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+
+			@Override
+			public void visit(ConnectionRequestReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendPrivateMessageReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(SendMessageAllReader reader, Void Context) {
+			}
+			@Override
+			public void visit(ErrorCodeReader reader, Void Context) {
+				throw new NullPointerException();
+			}
+		};
+		ByteBuffer bb = ByteBuffer.allocate(4);
+		bb.put((byte)6)
+			.put((byte)1)
+			.put((byte)6)
+			.put((byte)1);
 		var OCR = new OpCodeReader();
-		OCR.process(bb);
+		assertEquals(ProcessStatus.DONE,OCR.process(bb));
 		OCR.reset();
-		assertThrows(IllegalStateException.class,()->OCR.get());
-		OCR.process(bb);
-		OCR.get();
+		assertThrows(IllegalStateException.class,()->OCR.accept(visitor,null));
+		assertEquals(ProcessStatus.DONE,OCR.process(bb));
+		assertThrows(NullPointerException.class,()->OCR.accept(visitor,null));
+	}
+	
+	@Tag("OpCodeReader")
+	@Test
+	public void OpCodeShouldReturnErrorWhenUnkownOpCode() {
+		ByteBuffer bb = ByteBuffer.allocate(4);
+		bb.put((byte)27);
+		var OCR = new OpCodeReader();
+		assertEquals(ProcessStatus.ERROR,OCR.process(bb));
 	}
 }

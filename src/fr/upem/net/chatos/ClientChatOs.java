@@ -15,9 +15,9 @@ import java.util.logging.Logger;
 
 import fr.upem.net.chatos.datagram.ConnectionRequest;
 import fr.upem.net.chatos.datagram.Datagram;
+import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.MessageAll;
 import fr.upem.net.chatos.datagram.PrivateMessage;
-import reader.ErrorCode;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 
@@ -87,7 +87,6 @@ public class ClientChatOs {
 				var bb = optBB.get();
 				if (bb.remaining() <= bbout.remaining()) {
 					queue.remove();
-					bb.flip();
 					bbout.put(bb);
 				} else {
 					break;

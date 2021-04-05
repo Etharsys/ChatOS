@@ -30,7 +30,8 @@ public class MessageAll implements Datagram{
 				.putShort((short)bblog.limit())
 				.put(bblog)
 				.putShort((short)bbmsg.limit())
-				.put(bbmsg));
+				.put(bbmsg)
+				.flip());
 	}
 
 	public String getSender() {

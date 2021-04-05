@@ -3,8 +3,10 @@ package reader;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
+import fr.upem.net.chatos.datagram.ErrorCode;
+
 //TODO le cas TCP connect
-public class ErrorCodeReader implements DatagramReader<Byte>{
+public class ErrorCodeReader implements DatagramReader<ErrorCode>{
 	private enum State {DONE,WAITING,ERROR};
 	private State state = State.WAITING;
 	private byte code;
@@ -34,8 +36,8 @@ public class ErrorCodeReader implements DatagramReader<Byte>{
 	}
 
 	@Override
-	public Byte get() {
-		return code;
+	public ErrorCode get() {
+		return new ErrorCode(code);
 	}
 
 	@Override

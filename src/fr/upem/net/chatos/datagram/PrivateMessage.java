@@ -42,7 +42,8 @@ public class PrivateMessage implements Datagram{
 				.putShort((short)bbrec.limit())
 				.put(bbrec)
 				.putShort((short)bbmsg.limit())
-				.put(bbmsg));
+				.put(bbmsg)
+				.flip());
 	}
 	
 	public String getSender() {

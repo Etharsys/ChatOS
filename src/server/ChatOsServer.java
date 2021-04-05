@@ -12,10 +12,18 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import fr.upem.net.chatos.datagram.Datagram;
+import fr.upem.net.chatos.datagram.ErrorCode;
+import fr.upem.net.chatos.datagram.MessageAll;
+import fr.upem.net.chatos.datagram.PrivateMessage;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 
@@ -26,15 +34,14 @@ public class ChatOsServer {
         final private SocketChannel sc;
         final private ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
         final private ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
+        final private Queue<Datagram> queue = new LinkedList<>();
         final private ChatOsServer server;
         
         
         final private ServerDatagramVisitor visitor = new ServerDatagramVisitor();
         final private OpCodeReader reader = new OpCodeReader();
         
-        private String login;
-        
-        private boolean waitingLogin = true;
+        private Optional<String> login = Optional.empty();
         
         private boolean closed;
         
@@ -44,17 +51,70 @@ public class ChatOsServer {
             this.server = server;
         }
         
+        /**
+         * Add a datagram to the queue
+         * @param datagram
+         */
+        private void queueDatagram(Datagram datagram) {
+        	queue.add(datagram);
+        	updateInterestOps();
+        }
+        
+        /**
+         * broadcast a message to every client connected
+         * @param message the message to broadcast
+         */
+        public void broadcast(MessageAll message) {
+        	server.broadcast(message, this);
+        }
+        
+        /**
+         * broadcast a message to a recipient if it is connected
+         * send an ERROR packet to the client "OK" if the recipient is connected and
+         * Inavlid Pseudonym otherwise
+         * @param message
+         */
+        public void broadcast(PrivateMessage message) {
+        	if (server.broadcast(message, message.getRecipient())) {
+        		queueDatagram(new ErrorCode(ErrorCode.OK));
+        	} else {
+        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
+        	}
+        }
+        
+        public void closeContext() {
+        	closed = true;
+        }
+        
+        public boolean isConnected() {
+        	return login.isPresent();
+        }
+        
         public void requestPseudonym(String pseudo) {
         	if (server.requestPseudonymAndAdd(pseudo, this)) {
         		//Send OK
+        		queueDatagram(new ErrorCode(ErrorCode.OK));
+        		login = Optional.of(pseudo);
         	} else {
         		//Send NOT AVAILABLE
+        		queueDatagram(new ErrorCode(ErrorCode.PSEUDO_UNAVAILABLE));
+        		closed = true;
         	}
         }
         
         private void updateInterestOps() {
-        	// TODO
-        	
+        	int intOps = 0;
+        	if (!closed && bbin.hasRemaining()) {
+        		intOps |= SelectionKey.OP_READ;
+        	}
+        	if (bbout.position() > 0 || queue.size() != 0) {
+        		intOps |= SelectionKey.OP_WRITE;
+        	}
+        	if (intOps == 0) {
+        		silentlyClose();
+        		return;
+        	}
+        	key.interestOps(intOps);
         }
         
         private void silentlyClose() {
@@ -90,7 +150,6 @@ public class ChatOsServer {
          *
          */
         private void processIn() {
-        	System.out.println(bbin);
 			for (var ps = reader.process(bbin); ps != ProcessStatus.REFILL; ps = reader.process(bbin)) {
 				if (ps == ProcessStatus.ERROR) {
 					silentlyClose();
@@ -98,6 +157,28 @@ public class ChatOsServer {
 				} else {
 					reader.accept(visitor, this);
 					reader.reset();
+				}
+			}
+        }
+        
+        /**
+         * Try to fill bbout from the queue
+         *
+         */
+        private void processOut() {
+    		while (!queue.isEmpty()) {
+				var datagram = queue.peek();
+				var optBB = datagram.toByteBuffer(logger);
+				if (optBB.isEmpty()) {
+					queue.remove();
+				}
+				var bb = optBB.get();
+				if (bb.remaining() <= bbout.remaining()) {
+					queue.remove();
+					System.out.println(bb);
+					bbout.put(bb);
+				} else {
+					break;
 				}
 			}
         }
@@ -111,8 +192,12 @@ public class ChatOsServer {
          * @throws IOException
          */
         private void doWrite() throws IOException {
-        	// TODO
-        	
+        	processOut();
+        	bbout.flip();
+        	System.out.println("Sending message : " + bbout);
+        	sc.write(bbout);
+        	bbout.compact();
+        	updateInterestOps();
         }
 	}
 	
@@ -140,6 +225,43 @@ public class ChatOsServer {
     	}
     	clientLoginMap.put(pseudo, context);
     	return true;
+    }
+    
+    /**
+     * Broadcast a private message to the correct recipient if it exist
+     * 
+     * @param message the message to broadcast
+     * @param sender SelectionKey of the sender
+     * @param recipient String representing the recipient
+     * @return if the recipient is connected to the server
+     */
+    public boolean broadcast(PrivateMessage message, String recipient) {
+    	Objects.requireNonNull(message);
+    	Objects.requireNonNull(recipient);
+    	if (!clientLoginMap.containsKey(recipient)) {
+    		return false;
+    	} else {
+    		var context = clientLoginMap.get(recipient);
+    		context.queueDatagram(message);
+    		return true;
+    	}
+    }
+    
+    /**
+     * Broadcast a message to every person connected with the exception of the sender
+     * 
+     * @param message the message to broadcast
+     * @param sender SelectionKey of the sender 
+     */
+    public void broadcast(MessageAll message, Context sender) {
+    	Objects.requireNonNull(message);
+    	Objects.requireNonNull(sender);
+    	for (SelectionKey key : selector.keys()) {
+    		if (key.isValid() && !key.isAcceptable() && !key.equals(sender.key)) {
+    			var context = (Context) key.attachment();
+    			context.queueDatagram(message);
+    		}
+    	}
     }
     
     public void launch() throws IOException {

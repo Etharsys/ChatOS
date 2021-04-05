@@ -39,5 +39,4 @@ public class ServerDatagramVisitor implements DatagramVisitor<Context> {
 		// TODO Auto-generated method stub
 		System.out.println("Received an error with op code : " + reader.get());
 	}
-
 }

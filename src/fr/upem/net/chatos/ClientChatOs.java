@@ -15,6 +15,7 @@ import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Logger;
 
+import reader.ErrorCode;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 
@@ -311,15 +312,76 @@ public class ClientChatOs {
 	/* ----------------------------------------------------------------- */
 	
 	/**
+	 * @throws IOException 
+	 * @brief Initiate connection to the server by performing a blocking TCP connection waiting
+	 * for server approval
+	 */
+	private boolean initiateConnection() throws IOException {
+		/* Create the CR packet */
+		var bblog = UTF8_CHARSET.encode(login);
+		if (bblog.limit() > 1024) {
+			System.out.println("Pseudo is too long");
+			return false;
+		}
+		var buff = ByteBuffer.allocate(1 + Short.BYTES + bblog.limit())
+				.put(OpCodeReader.CR_CODE)
+				.putShort((short)bblog.limit())
+				.put(bblog)
+				.flip();
+		System.out.println(buff);
+		sc.write(buff);
+		/* Read the ErrorCode */
+		System.out.println("buffer was send");
+		var bb = ByteBuffer.allocate(2);
+		if (!readFully(sc, bb)) {
+			return false;
+		}
+		bb.flip();
+		if (bb.get() != OpCodeReader.ERROR_PACKET_CODE) {
+			System.out.println("Wrong packet from the server, terminating...");
+			return false;
+		};
+		var err = bb.get();
+		if (err != ErrorCode.OK) {
+			switch(err) {
+			case ErrorCode.PSEUDO_UNAVAILABLE:
+				System.out.println("Pseudo already taken, please retry with another one");
+				break;
+			default:
+				System.out.println("Unkown Error from the server");
+				break;
+			}
+			return false;
+		}
+		System.out.println("Pseudonym was accepted");
+		return true;
+	}
+	
+	
+	static boolean readFully(SocketChannel sc, ByteBuffer bb) throws IOException {
+  		while(bb.hasRemaining()) {
+  			if(sc.read(bb) == -1) {
+  				return false;
+  			}
+  		}
+  		return true;
+  	}
+	/**
 	 * @brief launch the server
 	 * @throws IOException when configureBlocking or connect throws it
 	 */
 	public void launch() throws IOException {
+		/* Initiate connection with the server (waiting for confirmation */
+		sc.connect(serverAddress);
+		if (!initiateConnection()) {
+			return;
+		}
+		
 		sc.configureBlocking(false);
 		var key = sc.register(selector, SelectionKey.OP_CONNECT);
 		uniqueContext = new Context(key);
 		key.attach(uniqueContext);
-		sc.connect(serverAddress); 
+		 
 		
 		console.start();
 		
@@ -379,15 +441,3 @@ public class ClientChatOs {
 	}
 	
 }
-
-
-
-
-/*// c'est le serveur qui parse la commande ->
-char prefix = command.split(" ")[0].charAt(0); 
-switch (prefix) {
-	case '/' : treatPrivateConnexion(command); break;
-	case '@' : treatPrivateMessage(command);   break;
-	default  : treatPublicMessage(command);    break;
-}
-*/

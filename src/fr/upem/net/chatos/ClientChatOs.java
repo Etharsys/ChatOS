@@ -7,14 +7,16 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
 import java.util.LinkedList;
-import java.util.Optional;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Logger;
 
+import fr.upem.net.chatos.datagram.ConnectionRequest;
+import fr.upem.net.chatos.datagram.Datagram;
+import fr.upem.net.chatos.datagram.MessageAll;
+import fr.upem.net.chatos.datagram.PrivateMessage;
 import reader.ErrorCode;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
@@ -30,10 +32,9 @@ public class ClientChatOs {
 		private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 		
-		private final Queue<ByteBuffer> queue     = new LinkedList<>();;
+		private final Queue<Datagram> queue = new LinkedList<>();
 		private final OpCodeReader reader = new OpCodeReader();
 		private final ClientDatagramVisitor visitor = new ClientDatagramVisitor();
-		//Reader here !
 		
 		private boolean closed = false;
 		
@@ -67,8 +68,8 @@ public class ClientChatOs {
 		 * @brief add a command to the commands queue
 		 * @param bb the command to add
 		 */
-		private void queueCommand(ByteBuffer bb) {
-			queue.add(bb);
+		private void queueCommand(Datagram datagram) {
+			queue.add(datagram);
 			processOut();
 			updateInterestOps();
 		}
@@ -78,7 +79,12 @@ public class ClientChatOs {
 		 */
 		private void processOut() {
 			while (!queue.isEmpty()) {
-				var bb = queue.peek();
+				var datagram = queue.peek();
+				var optBB = datagram.toByteBuffer(logger);
+				if (optBB.isEmpty()) {
+					queue.remove();
+				}
+				var bb = optBB.get();
 				if (bb.remaining() <= bbout.remaining()) {
 					queue.remove();
 					bb.flip();
@@ -160,8 +166,6 @@ public class ClientChatOs {
 	static private int       MAX_STRING_SIZE = 1_024;
 	static private Logger    logger      = Logger.getLogger(ClientChatOs.class.getName());
 	static private final int maxLoginLength = 32;
-
-	private final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 	
 	private final Thread                     console;
 	private final ArrayBlockingQueue<String> commandQueue; 
@@ -223,62 +227,6 @@ public class ClientChatOs {
 		selector.wakeup();
 		commandQueue.add(command);
 	}
-	/**
-	 * 
-	 * @param message message to encode
-	 * @return an Optional containing the datagram MessageToAll if the message is not too long.
-	 * Optional.empty() otherwise
-	 */
-	private Optional<ByteBuffer> createMessageToAll(String message) {
-		logger.info("adding message to queue : " + message  + " from : "
-				+ login);
-		
-		var bblog = UTF8_CHARSET.encode(login);
-		var bbmsg = UTF8_CHARSET.encode(message);
-		if (bbmsg.limit() > MAX_STRING_SIZE) {
-			logger.info("Message exceed the limit (1024), ignoring command");
-			return Optional.empty();
-		}
-		return Optional.of(ByteBuffer.allocate(1+2*Short.BYTES + bblog.limit() + bbmsg.limit())
-				.put(OpCodeReader.SMA_CODE)
-				.putShort((short)bblog.limit())
-				.put(bblog)
-				.putShort((short)bbmsg.limit())
-				.put(bbmsg));
-	}
-	
-	/**
-	 * 
-	 * @param recipient recipient to send to
-	 * @param message message to encode
-	 * @return an Optional containing the datagram PrivateMessage if the message is not too long.
-	 * Optional.empty() otherwise
-	 */
-	private Optional<ByteBuffer> createMessageToRecipient(String recipient, String message) {
-		logger.info("adding message to queue : " + message  + " from : "
-				+ login +" to : " + recipient);
-		
-		var bblog = UTF8_CHARSET.encode(login);
-		var bbrec = UTF8_CHARSET.encode(recipient);
-		var bbmsg = UTF8_CHARSET.encode(message);
-		
-		if (bbrec.limit() > MAX_STRING_SIZE) {
-			logger.info("Recipient exceed the limit (1024), ignoring command");
-			return Optional.empty();
-		}
-		if (bbmsg.limit() > MAX_STRING_SIZE) {
-			logger.info("Message exceed the limit (1024), ignoring command");
-			return Optional.empty();
-		}
-		return Optional.of(ByteBuffer.allocate(1+3*Short.BYTES + bblog.limit() + bbrec.limit() + bbmsg.limit())
-				.put(OpCodeReader.SPM_CODE)
-				.putShort((short)bblog.limit())
-				.put(bblog)
-				.putShort((short)bbrec.limit())
-				.put(bbrec)
-				.putShort((short)bbmsg.limit())
-				.put(bbmsg));
-	}
 	
 	/**
 	 * @brief process the first command in commandQueue
@@ -288,25 +236,23 @@ public class ClientChatOs {
 			return;
 		var command = commandQueue.poll();
 		
-		Optional<ByteBuffer> bb;
+		Datagram datagram;
 		if (!command.startsWith("@") && !command.startsWith("/")) {
-			bb = createMessageToAll(command);
+			datagram = new MessageAll(login, command);
 		} else {
 			if (command.startsWith("@")) {
 				var type = command.split(" ",2);
 				if (type.length != 2) {
 					System.out.println("not enough args");
 				}
-				bb = createMessageToRecipient(type[0].substring(1), type[1]);
+				datagram = new PrivateMessage(login,type[0].substring(1), type[1]);
 			} else {
 				//TCP le pas beau a faire
 				logger.severe("Not yes implemented");
-				bb = Optional.empty();
+				throw new UnsupportedClassVersionError("Not implemented");
 			}
 		}
-		if (bb.isPresent()) {
-			uniqueContext.queueCommand(bb.get());
-		}
+		uniqueContext.queueCommand(datagram);
 	}
 	
 	/* ----------------------------------------------------------------- */
@@ -318,20 +264,14 @@ public class ClientChatOs {
 	 */
 	private boolean initiateConnection() throws IOException {
 		/* Create the CR packet */
-		var bblog = UTF8_CHARSET.encode(login);
-		if (bblog.limit() > 1024) {
-			System.out.println("Pseudo is too long");
+		var CR = new ConnectionRequest(login);
+		var optBB = CR.toByteBuffer(logger);
+		if (optBB.isEmpty()) {
 			return false;
 		}
-		var buff = ByteBuffer.allocate(1 + Short.BYTES + bblog.limit())
-				.put(OpCodeReader.CR_CODE)
-				.putShort((short)bblog.limit())
-				.put(bblog)
-				.flip();
-		System.out.println(buff);
-		sc.write(buff);
+		sc.write(optBB.get());
+		
 		/* Read the ErrorCode */
-		System.out.println("buffer was send");
 		var bb = ByteBuffer.allocate(2);
 		if (!readFully(sc, bb)) {
 			return false;

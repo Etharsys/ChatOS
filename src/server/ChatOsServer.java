@@ -11,6 +11,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -41,6 +42,14 @@ public class ChatOsServer {
             this.key = key;
             this.sc = (SocketChannel) key.channel();
             this.server = server;
+        }
+        
+        public void requestPseudonym(String pseudo) {
+        	if (server.requestPseudonymAndAdd(pseudo, this)) {
+        		//Send OK
+        	} else {
+        		//Send NOT AVAILABLE
+        	}
         }
         
         private void updateInterestOps() {
@@ -110,6 +119,8 @@ public class ChatOsServer {
     static private int BUFFER_SIZE = 1_024;
     static private Logger logger = Logger.getLogger(ChatOsServer.class.getName());
 
+    
+    private final HashMap<String, Context> clientLoginMap = new HashMap<>();
     private final ServerSocketChannel serverSocketChannel;
     private final Selector selector;
 	
@@ -117,6 +128,18 @@ public class ChatOsServer {
         serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.bind(new InetSocketAddress(port));
         selector = Selector.open();
+    }
+    
+    /**
+     * Add the pair pseudonym/context to the map only if the key is not in the map
+     * @return true is the pseudonym is available
+     */
+    public boolean requestPseudonymAndAdd(String pseudo, Context context) {
+    	if (clientLoginMap.containsKey(pseudo)) {
+    		return false;
+    	}
+    	clientLoginMap.put(pseudo, context);
+    	return true;
     }
     
     public void launch() throws IOException {

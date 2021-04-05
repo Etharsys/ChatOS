@@ -3,8 +3,10 @@ package reader;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
+import fr.upem.net.chatos.datagram.MessageAll;
 
-public class SendMessageAllReader implements DatagramReader<Message> {
+
+public class SendMessageAllReader implements DatagramReader<MessageAll> {
 	private enum State {DONE,WAITING_LOGIN, WAITING_MESSAGE,ERROR};
 	
     private State state = State.WAITING_LOGIN;
@@ -47,11 +49,11 @@ public class SendMessageAllReader implements DatagramReader<Message> {
     }
 
     @Override
-    public Message get() {
+    public MessageAll get() {
         if (state!= State.DONE) {
             throw new IllegalStateException();
         }
-        return new Message(login, null, message);
+        return new MessageAll(login, message);
     }
 
     @Override

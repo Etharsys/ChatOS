@@ -76,7 +76,6 @@ public class SendMessageAllReaderTest {
 				var msg = reader.get();
 				assertEquals("abc", msg.getSender());
 				assertEquals("salut",msg.getMessage());
-				assertEquals(Optional.<String>empty(),msg.getRecipient());
 				throw new NullPointerException();
 			}
 			@Override

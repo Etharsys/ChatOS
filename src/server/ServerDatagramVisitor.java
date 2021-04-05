@@ -8,7 +8,6 @@ import reader.SendPrivateMessageReader;
 import server.ChatOsServer.Context;
 
 public class ServerDatagramVisitor implements DatagramVisitor<Context> {
-
 	@Override
 	public void visit(ConnectionRequestReader reader, Context context) {
 		// TODO Auto-generated method stub
@@ -21,7 +20,7 @@ public class ServerDatagramVisitor implements DatagramVisitor<Context> {
 		var msg = reader.get();
 		System.out.println("Server received PrivateMessage with the login : " );
 		System.out.println("from : " + msg.getSender());
-		System.out.println("to : " + msg.getRecipient().get());
+		System.out.println("to : " + msg.getRecipient());
 		System.out.println(msg.getMessage());
 	}
 

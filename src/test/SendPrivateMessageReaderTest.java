@@ -77,8 +77,7 @@ public class SendPrivateMessageReaderTest {
 				assertEquals("abc", msg.getSender());
 				assertEquals("salut",msg.getMessage());
 				var recipient = msg.getRecipient();
-				assert(Optional.<String>empty() != recipient);
-				assertEquals("def",recipient.get());
+				assertEquals("def",recipient);
 				throw new NullPointerException();
 			}
 

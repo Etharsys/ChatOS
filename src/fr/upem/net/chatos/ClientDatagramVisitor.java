@@ -1,11 +1,13 @@
 package fr.upem.net.chatos;
 
 import fr.upem.net.chatos.ClientChatOs.Context;
+import fr.upem.net.chatos.datagram.TCPAsk;
 import reader.ConnectionRequestReader;
 import reader.DatagramVisitor;
 import reader.ErrorCodeReader;
 import reader.SendMessageAllReader;
 import reader.SendPrivateMessageReader;
+import reader.TCPAskReader;
 
 public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.Context>{
 
@@ -33,6 +35,15 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.Conte
 	public void visit(ErrorCodeReader reader, Context context) {
 		// TODO Auto-generated method stub
 		System.out.println("Received an error " + reader.get());
+	}
+
+	@Override
+	public void visit(TCPAskReader reader, Context context) {
+		// TODO Auto-generated method stub
+		TCPAsk tcpAsk = reader.get();
+		System.out.println("Received a TCPAsk with the arguments : ");
+		System.out.println("Sender : " + tcpAsk.getSender());
+		System.out.println("Recipient : " + tcpAsk.getRecipient());
 	}
 
 }

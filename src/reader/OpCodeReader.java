@@ -10,6 +10,7 @@ public class OpCodeReader{
 	static public final byte CR_CODE = 1;
 	static public final byte SPM_CODE = 2;
 	static public final byte SMA_CODE = 3;
+	static public final byte TCPASK_CODE = 4;
 	static public final byte ERROR_PACKET_CODE = 6;
 	
 	private enum State {DONE,WAITING,ERROR};
@@ -18,6 +19,7 @@ public class OpCodeReader{
 	private final SendPrivateMessageReader SPM = new SendPrivateMessageReader();
 	private final SendMessageAllReader SMA = new SendMessageAllReader();
 	private final ErrorCodeReader ERROR = new ErrorCodeReader();
+	private final TCPAskReader TCP = new TCPAskReader();
 	//TODO les autres (TCP)
 	private Optional<DatagramReader<?>> reader = Optional.empty();
 	
@@ -36,8 +38,8 @@ public class OpCodeReader{
 		case SMA_CODE:
 			reader = Optional.of(SMA);
 			break;
-		case 4:
-			throw new UnsupportedClassVersionError();
+		case TCPASK_CODE:
+			reader = Optional.of(TCP);
 		case 5:
 			throw new UnsupportedClassVersionError();
 		case ERROR_PACKET_CODE:

@@ -17,6 +17,7 @@ import reader.ErrorCodeReader;
 import reader.Reader.ProcessStatus;
 import reader.SendMessageAllReader;
 import reader.SendPrivateMessageReader;
+import reader.TCPAskReader;
 
 public class SendMessageAllReaderTest {
 	private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -80,6 +81,10 @@ public class SendMessageAllReaderTest {
 			}
 			@Override
 			public void visit(ErrorCodeReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(TCPAskReader tcpAskReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);

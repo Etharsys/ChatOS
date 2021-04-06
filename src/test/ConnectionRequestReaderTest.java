@@ -16,6 +16,7 @@ import reader.ErrorCodeReader;
 import reader.Reader.ProcessStatus;
 import reader.SendMessageAllReader;
 import reader.SendPrivateMessageReader;
+import reader.TCPAskReader;
 
 
 public class ConnectionRequestReaderTest {
@@ -75,6 +76,10 @@ public class ConnectionRequestReaderTest {
 			}
 			@Override
 			public void visit(ErrorCodeReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(TCPAskReader tcpAskReader, Void context) {
 			}
 		};
 		

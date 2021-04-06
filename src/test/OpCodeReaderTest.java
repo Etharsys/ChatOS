@@ -15,6 +15,7 @@ import reader.ErrorCodeReader;
 import reader.OpCodeReader;
 import reader.SendMessageAllReader;
 import reader.SendPrivateMessageReader;
+import reader.TCPAskReader;
 import reader.Reader.ProcessStatus;
 
 class OpCodeReaderTest {
@@ -42,6 +43,10 @@ class OpCodeReaderTest {
 			}
 			@Override
 			public void visit(ErrorCodeReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(TCPAskReader tcpAskReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
@@ -73,6 +78,10 @@ class OpCodeReaderTest {
 			}
 			@Override
 			public void visit(ErrorCodeReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(TCPAskReader tcpAskReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
@@ -109,6 +118,10 @@ class OpCodeReaderTest {
 			@Override
 			public void visit(ErrorCodeReader reader, Void Context) {
 			}
+
+			@Override
+			public void visit(TCPAskReader tcpAskReader, Void context) {
+			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)3)
@@ -141,6 +154,10 @@ class OpCodeReaderTest {
 			public void visit(ErrorCodeReader reader, Void Context) {
 				reader.get();
 				throw new NullPointerException();
+			}
+
+			@Override
+			public void visit(TCPAskReader tcpAskReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
@@ -181,6 +198,10 @@ class OpCodeReaderTest {
 			@Override
 			public void visit(ErrorCodeReader reader, Void Context) {
 			}
+
+			@Override
+			public void visit(TCPAskReader tcpAskReader, Void context) {
+			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)6);
@@ -208,6 +229,10 @@ class OpCodeReaderTest {
 			@Override
 			public void visit(ErrorCodeReader reader, Void Context) {
 				throw new NullPointerException();
+			}
+
+			@Override
+			public void visit(TCPAskReader tcpAskReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);

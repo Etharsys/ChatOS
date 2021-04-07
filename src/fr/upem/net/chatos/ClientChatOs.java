@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -21,15 +22,24 @@ import fr.upem.net.chatos.datagram.Datagram;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.MessageAll;
 import fr.upem.net.chatos.datagram.PrivateMessage;
+import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
+import fr.upem.net.chatos.datagram.TCPDenied;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 
 public class ClientChatOs {
-	public class Context {
+	private interface Context {
+		void doRead() throws IOException;
+		void doWrite() throws IOException;
+		void doConnect() throws IOException;
+	}
+	
+	public class ChatContext implements Context{
 		
 		private final SelectionKey key;
 		private final SocketChannel sc;
+		private final ClientChatOs client;
 		
 		private final int BUFFER_MAX_SIZE = (MAX_STRING_SIZE + Short.BYTES) * 3 + 1;
 		
@@ -46,9 +56,10 @@ public class ClientChatOs {
 		 * Context contructor
 		 * @param key the selected key to attach to this context (client)
 		 */
-		private Context(SelectionKey key) {
+		private ChatContext(SelectionKey key, ClientChatOs client) {
 			this.key = key;
 			this.sc  = (SocketChannel) key.channel();
+			this.client = client;
 		}
 		
 		/**
@@ -131,7 +142,7 @@ public class ClientChatOs {
 		 * @brief read from the socket channel (bbin should be in write mode before and after)
 		 * @throws IOException when read throws it
 		 */
-		private void doRead() throws IOException {
+		public void doRead() throws IOException {
 			System.out.println("Reading...");
 			if (sc.read(bbin) == -1) {
 				closed = true;
@@ -144,24 +155,147 @@ public class ClientChatOs {
 		 * @brief write to the socket channel (bbout should be in write mode before and after)
 		 * @throws IOException when write throws it
 		 */
-		private void doWrite() throws IOException {
+		public void doWrite() throws IOException {
 			bbout.flip();
 			sc.write(bbout);
 			bbout.compact();
 			processOut();
 			updateInterestOps();
 		}
+
+		@Override
+		public void doConnect() throws IOException {
+			throw new AssertionError();
+		}
+		
+		public void acceptTCP(TCPAsk tcpAsk){
+			client.acceptTCPConnection(tcpAsk);
+		}
+	}
+	
+	public void acceptTCPConnection(TCPAsk tcpAsk){
+		//TODO c'est marche pas
+		if (TCPCommandMap.containsKey(tcpAsk.getSender())) {
+			chatContext.queueCommand(new TCPDenied(tcpAsk.getSender(), tcpAsk.getRecipient(), tcpAsk.getPassword()));
+			return;
+		}
+		try {
+			
+			var socket = SocketChannel.open();
+			socket.configureBlocking(false);
+			var key = socket.register(selector, SelectionKey.OP_CONNECT);
+			key.attach(new TCPContextWaiter(key, sc, tcpAsk.getRecipient(), (new TCPAccept(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()).toByteBuffer(logger).get())));
+			TCPCommandMap.put(tcpAsk.getSender(), new ArrayList<>());
+		} catch(IOException e) {
+			chatContext.queueCommand(new TCPDenied(tcpAsk.getSender(), tcpAsk.getRecipient(), tcpAsk.getPassword()));
+		}
+	}
+	
+	public class TCPContextWaiter implements Context{
+		private final String recipient;
+		
+		private final SelectionKey key;
+		private final SocketChannel sc;
+		private final ByteBuffer bbin = ByteBuffer.allocate(2);
+		private final ByteBuffer bbout;
+		
+		private boolean closed;
+		
+		public TCPContextWaiter(SelectionKey key, SocketChannel sc, String recipient, ByteBuffer buffer) {
+			Objects.requireNonNull(key);
+			Objects.requireNonNull(sc);
+			Objects.requireNonNull(recipient);
+			this.key = key;
+			this.sc = sc;
+			this.recipient = recipient;
+			bbout = buffer;
+		}
+		
+		private void updateInterestOps() {
+        	int intOps = 0;
+        	if (!closed && bbin.hasRemaining()) {
+        		intOps |= SelectionKey.OP_READ;
+        	}
+        	if (!closed && bbout.position() > 0) {
+        		intOps |= SelectionKey.OP_WRITE;
+        	}
+        	if (intOps == 0) {
+        		silentlyClose();
+        		return;
+        	}
+        	key.interestOps(intOps);
+        }
+		
+		@Override
+		public void doRead() throws IOException {
+			if (sc.read(bbin) == -1) {
+				closed = true;
+        		return;
+        	}
+			processIn();
+			updateInterestOps();
+		}
+
+		private void processIn() {
+			if (!bbin.hasRemaining()) {
+				if (bbin.get() != OpCodeReader.ERROR_PACKET_CODE) {
+					System.out.println("Didn't receive ErrorCode");
+				}
+				var err = new ErrorCode(bbin.get());
+				System.out.println("Received " + err);
+				if (err.getErrorCode() != ErrorCode.OK) {
+					closed = true;
+				} else {
+					var context = new TCPContext(key,sc,recipient);
+					key.attach(context);
+					context.updateInterestOps();
+				}
+			}
+		}
+
+		@Override
+		public void doWrite() throws IOException {
+			if (sc.write(bbout) == -1) {
+				closed = true;
+				return;
+			}
+		}
+		
+		private void silentlyClose() {
+            try {
+                sc.close();
+            } catch (IOException e) {
+                // ignore exception
+            }
+        }
+
+		@Override
+		public void doConnect() throws IOException {
+			System.out.println(sc.finishConnect());
+        	if (!sc.finishConnect()) {
+        		return;
+        	}
+        	key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+        }
 	}
 	
 	/**
 	 * 
 	 * Context of a TCP connection
 	 */
-	public class TCPContext {
+	public class TCPContext implements Context{
+		private final static int BUFFER_SIZE = 1024;
+		//TODO
 		private final SelectionKey key;
 		private final SocketChannel sc;
+		private final ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
+		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
+		
+		private Optional<OpCodeReader> reader = Optional.of(new OpCodeReader());
 		
 		private final String recipient;
+		
+		private boolean closed;
 		
 		public TCPContext(SelectionKey key, SocketChannel sc, String recipient) {
 			Objects.requireNonNull(key);
@@ -170,6 +304,49 @@ public class ClientChatOs {
 			this.key = key;
 			this.sc = sc;
 			this.recipient = recipient;
+		}
+		
+		private void updateInterestOps() {
+        	int intOps = 0;
+        	if (!closed && bbin.hasRemaining() && !reader.isEmpty()) {
+        		intOps |= SelectionKey.OP_READ;
+        	}
+        	if (bbout.position() > 0 || !(TCPCommandMap.get(recipient).isEmpty())){
+        		intOps |= SelectionKey.OP_WRITE;
+        	}
+        	if (intOps == 0) {
+        		silentlyClose();
+        		return;
+        	}
+        	key.interestOps(intOps);
+        }
+
+		@Override
+		public void doRead() throws IOException {
+			// TODO Auto-generated method stub
+			if (sc.read(bbin) == -1) {
+        		closed = true;
+        	}
+			
+		}
+
+		@Override
+		public void doWrite() throws IOException {
+			// TODO Auto-generated method stub
+			
+		}
+		
+		private void silentlyClose() {
+            try {
+                sc.close();
+            } catch (IOException e) {
+                // ignore exception
+            }
+        }
+
+		@Override
+		public void doConnect() throws IOException {
+			throw new AssertionError();
 		}
 	}
 	
@@ -191,7 +368,7 @@ public class ClientChatOs {
 	private final Selector          selector;
 	private final InetSocketAddress serverAddress;
 	
-	private Context uniqueContext;
+	private ChatContext chatContext;
 	
 	private final String login;
 	private final int    maxCommands    = 10;
@@ -283,7 +460,7 @@ public class ClientChatOs {
 					}
 				}
 			}
-			uniqueContext.queueCommand(datagram);
+			chatContext.queueCommand(datagram);
 		}
 	}
 	
@@ -351,8 +528,8 @@ public class ClientChatOs {
 		
 		sc.configureBlocking(false);
 		var key = sc.register(selector, SelectionKey.OP_READ);
-		uniqueContext = new Context(key);
-		key.attach(uniqueContext);
+		chatContext = new ChatContext(key, this);
+		key.attach(chatContext);
 		 
 		
 		console.start();
@@ -374,10 +551,10 @@ public class ClientChatOs {
 	private void treatKey(SelectionKey key) {
         try {
             if (key.isValid() && key.isWritable()) {
-                uniqueContext.doWrite();
+                ((Context)key.attachment()).doWrite();
             }
             if (key.isValid() && key.isReadable()) {
-                uniqueContext.doRead();
+            	((Context)key.attachment()).doRead();
             }
         } catch(IOException ioe) {
             throw new UncheckedIOException(ioe);

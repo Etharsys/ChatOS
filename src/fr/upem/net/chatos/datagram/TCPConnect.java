@@ -8,7 +8,7 @@ import reader.OpCodeReader;
 
 public class TCPConnect extends AbstractTCPDatagram {
 
-	TCPConnect(String sender, String recipient, short password) {
+	public TCPConnect(String sender, String recipient, short password) {
 		super(sender, recipient, password);
 	}
 

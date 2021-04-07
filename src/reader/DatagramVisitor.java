@@ -11,4 +11,10 @@ public interface DatagramVisitor<T> {
 	public void visit(ErrorCodeReader reader, T context);
 
 	public void visit(TCPAskReader tcpAskReader, T context);
+
+	public void visit(TCPDeniedReader tcpDeniedReader, T context);
+
+	public void visit(TCPConnectReader tcpConnectReader, T context);
+
+	public void visit(TCPAcceptReader tcpAcceptReader, T context);
 }

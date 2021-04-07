@@ -8,7 +8,7 @@ import reader.OpCodeReader;
 
 public class TCPDenied extends AbstractTCPDatagram{
 
-	TCPDenied(String sender, String recipient, short password) {
+	public TCPDenied(String sender, String recipient, short password) {
 		super(sender, recipient, password);
 	}
 

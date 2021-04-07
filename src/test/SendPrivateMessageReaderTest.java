@@ -17,7 +17,10 @@ import reader.ErrorCodeReader;
 import reader.Reader.ProcessStatus;
 import reader.SendMessageAllReader;
 import reader.SendPrivateMessageReader;
+import reader.TCPAcceptReader;
 import reader.TCPAskReader;
+import reader.TCPConnectReader;
+import reader.TCPDeniedReader;
 
 public class SendPrivateMessageReaderTest {
 	private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -92,6 +95,18 @@ public class SendPrivateMessageReaderTest {
 
 			@Override
 			public void visit(TCPAskReader tcpAskReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPConnectReader tcpConnectReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPAcceptReader tcpAcceptReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);

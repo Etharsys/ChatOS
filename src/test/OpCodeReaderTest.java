@@ -15,7 +15,10 @@ import reader.ErrorCodeReader;
 import reader.OpCodeReader;
 import reader.SendMessageAllReader;
 import reader.SendPrivateMessageReader;
+import reader.TCPAcceptReader;
 import reader.TCPAskReader;
+import reader.TCPConnectReader;
+import reader.TCPDeniedReader;
 import reader.Reader.ProcessStatus;
 
 class OpCodeReaderTest {
@@ -47,6 +50,18 @@ class OpCodeReaderTest {
 
 			@Override
 			public void visit(TCPAskReader tcpAskReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPConnectReader tcpConnectReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPAcceptReader tcpAcceptReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
@@ -82,6 +97,18 @@ class OpCodeReaderTest {
 
 			@Override
 			public void visit(TCPAskReader tcpAskReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPConnectReader tcpConnectReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPAcceptReader tcpAcceptReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
@@ -122,6 +149,18 @@ class OpCodeReaderTest {
 			@Override
 			public void visit(TCPAskReader tcpAskReader, Void context) {
 			}
+
+			@Override
+			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPConnectReader tcpConnectReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPAcceptReader tcpAcceptReader, Void context) {
+			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)3)
@@ -158,6 +197,18 @@ class OpCodeReaderTest {
 
 			@Override
 			public void visit(TCPAskReader tcpAskReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPConnectReader tcpConnectReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPAcceptReader tcpAcceptReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
@@ -202,6 +253,18 @@ class OpCodeReaderTest {
 			@Override
 			public void visit(TCPAskReader tcpAskReader, Void context) {
 			}
+
+			@Override
+			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPConnectReader tcpConnectReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPAcceptReader tcpAcceptReader, Void context) {
+			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)6);
@@ -233,6 +296,18 @@ class OpCodeReaderTest {
 
 			@Override
 			public void visit(TCPAskReader tcpAskReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPConnectReader tcpConnectReader, Void context) {
+			}
+
+			@Override
+			public void visit(TCPAcceptReader tcpAcceptReader, Void context) {
 			}
 		};
 		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);

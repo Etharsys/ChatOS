@@ -12,5 +12,4 @@ public class TCPAskReader extends AbstractTCPDatagramReader<TCPAsk> {
 	public <T> void accept(DatagramVisitor<T> visitor, T context) {
 		visitor.visit(this, context);
 	}
-
 }

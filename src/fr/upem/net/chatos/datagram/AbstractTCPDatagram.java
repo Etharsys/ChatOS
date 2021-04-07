@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
 
-abstract class AbstractTCPDatagram implements Datagram{
+abstract class AbstractTCPDatagram implements TCPDatagram{
 	private final String sender;
 	private final String recipient;
 	private final short password;
@@ -18,14 +18,17 @@ abstract class AbstractTCPDatagram implements Datagram{
 		this.password = password;
 	}
 	
+	@Override
 	public short getPassword() {
 		return password;
 	}
 	
+	@Override
 	public String getRecipient() {
 		return recipient;
 	}
 	
+	@Override
 	public String getSender() {
 		return sender;
 	}

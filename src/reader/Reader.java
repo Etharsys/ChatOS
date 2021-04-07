@@ -12,5 +12,4 @@ public interface Reader<T> {
     public T get();
 
     public void reset();
-
 }

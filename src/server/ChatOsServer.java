@@ -24,6 +24,7 @@ import fr.upem.net.chatos.datagram.Datagram;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.MessageAll;
 import fr.upem.net.chatos.datagram.PrivateMessage;
+import fr.upem.net.chatos.datagram.TCPAsk;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 
@@ -62,23 +63,46 @@ public class ChatOsServer {
         
         /**
          * broadcast a message to every client connected
+         * Send back Invalid Pseudonym if the sender is not associated with this context
          * @param message the message to broadcast
          */
         public void broadcast(MessageAll message) {
+        	if (!message.getSender().equals(login.get())) {
+        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
+        		return;
+        	}
         	server.broadcast(message, this);
+        	queueDatagram(new ErrorCode(ErrorCode.OK));
+        }
+        
+        public void broadcast(TCPAsk message) {
+        	if (!message.getSender().equals(login.get())) {
+        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
+        		return;
+        	}
+        	if (server.broadcast(message)) {
+        		queueDatagram(new ErrorCode(ErrorCode.OK));
+        	} else {
+        		queueDatagram(new ErrorCode(ErrorCode.UNREACHABLE_USER));
+        	}
         }
         
         /**
          * broadcast a message to a recipient if it is connected
          * send an ERROR packet to the client "OK" if the recipient is connected and
-         * Inavlid Pseudonym otherwise
+         * Unreachable User otherwise
+         * Send back Invalid Pseudonym if the sender is not associated with this context
          * @param message
          */
         public void broadcast(PrivateMessage message) {
+        	if (!message.getSender().equals(login.get())) {
+        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
+        		return;
+        	}
         	if (server.broadcast(message, message.getRecipient())) {
         		queueDatagram(new ErrorCode(ErrorCode.OK));
         	} else {
-        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
+        		queueDatagram(new ErrorCode(ErrorCode.UNREACHABLE_USER));
         	}
         }
         
@@ -134,7 +158,6 @@ public class ChatOsServer {
          * @throws IOException
          */
         private void doRead() throws IOException {
-        	// TODO
         	if (sc.read(bbin) == -1) {
         		closed = true;
         	}
@@ -232,8 +255,8 @@ public class ChatOsServer {
         serverSocketChannel.bind(new InetSocketAddress(port));
         selector = Selector.open();
     }
-    
-    /**
+
+	/**
      * Add the pair pseudonym/context to the map only if the key is not in the map
      * @return true is the pseudonym is available
      */
@@ -265,6 +288,11 @@ public class ChatOsServer {
     	}
     }
     
+    public boolean broadcast(TCPAsk message) {
+		
+		// TODO Auto-generated method stub
+    	return false;
+	}
     /**
      * Broadcast a message to every person connected with the exception of the sender
      * 
@@ -317,11 +345,14 @@ public class ChatOsServer {
 		} catch (IOException e) {
 			logger.log(Level.INFO,"Connection closed with client due to IOException",e);
 			silentlyClose(key);
+			var login = ((Context)key.attachment()).login;
+			if (login.isPresent()) {
+				clientLoginMap.remove(login.get());
+			}
 		}
 	}
     
     private void doAccept(SelectionKey key) throws IOException {
-    	// TODO
     	ServerSocketChannel ssc = (ServerSocketChannel) key.channel();
 		SocketChannel sc = ssc.accept();
 		if (sc == null) {

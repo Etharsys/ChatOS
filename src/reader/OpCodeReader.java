@@ -11,7 +11,10 @@ public class OpCodeReader{
 	static public final byte SPM_CODE = 2;
 	static public final byte SMA_CODE = 3;
 	static public final byte TCPASK_CODE = 4;
-	static public final byte ERROR_PACKET_CODE = 6;
+	static public final byte TCPACCEPT_CODE = 5;
+	static public final byte TCPDENIED_CODE = 6;
+	static public final byte TCPCONNECT_CODE = 7;
+	static public final byte ERROR_PACKET_CODE = 8;
 	
 	private enum State {DONE,WAITING,ERROR};
 	private State state = State.WAITING;
@@ -40,7 +43,8 @@ public class OpCodeReader{
 			break;
 		case TCPASK_CODE:
 			reader = Optional.of(TCP);
-		case 5:
+			break;
+		case TCPACCEPT_CODE:
 			throw new UnsupportedClassVersionError();
 		case ERROR_PACKET_CODE:
 			reader = Optional.of(ERROR);

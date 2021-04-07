@@ -6,14 +6,15 @@ import java.util.logging.Logger;
 
 import reader.OpCodeReader;
 
-public class TCPAsk extends AbstractTCPDatagram{
-	
-	public TCPAsk(String sender, String recipient, short password) {
-		super(sender,recipient,password);
+public class TCPDenied extends AbstractTCPDatagram{
+
+	TCPDenied(String sender, String recipient, short password) {
+		super(sender, recipient, password);
 	}
-	
+
 	@Override
 	public Optional<ByteBuffer> toByteBuffer(Logger logger) {
-		return super.toByteBuffer(logger, OpCodeReader.TCPASK_CODE);
+		return super.toByteBuffer(logger, OpCodeReader.TCPDENIED_CODE);
 	}
+
 }

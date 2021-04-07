@@ -18,6 +18,8 @@ public class OpCodeReader{
 	
 	private enum State {DONE,WAITING,ERROR};
 	private State state = State.WAITING;
+	
+	//Readers
 	private final ConnectionRequestReader CR = new ConnectionRequestReader();
 	private final SendPrivateMessageReader SPM = new SendPrivateMessageReader();
 	private final SendMessageAllReader SMA = new SendMessageAllReader();
@@ -26,7 +28,7 @@ public class OpCodeReader{
 	private final TCPAcceptReader TCPAccept = new TCPAcceptReader();
 	private final TCPDeniedReader TCPDenied = new TCPDeniedReader();
 	private final TCPConnectReader TCPConnect = new TCPConnectReader();
-	//TODO les autres (TCP)
+	
 	private Optional<DatagramReader<?>> reader = Optional.empty();
 	
 	private ProcessStatus getReader(ByteBuffer bb) {

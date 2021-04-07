@@ -13,18 +13,18 @@ import reader.TCPAcceptReader;
 import reader.TCPAskReader;
 import reader.TCPConnectReader;
 import reader.TCPDeniedReader;
-import server.ChatOsServer.Context;
+import server.ChatOsServer.ChatContext;
 
-public class ServerDatagramVisitor implements DatagramVisitor<Context> {
+public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 	@Override
-	public void visit(ConnectionRequestReader reader, Context context) {
+	public void visit(ConnectionRequestReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		System.out.println("Server received ConnectionRequest with the login : " + reader.get());
 		context.requestPseudonym(reader.get());
 	}
 
 	@Override
-	public void visit(SendPrivateMessageReader reader, Context context) {
+	public void visit(SendPrivateMessageReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		if (!context.isConnected()) {
 			context.closeContext();
@@ -38,7 +38,7 @@ public class ServerDatagramVisitor implements DatagramVisitor<Context> {
 	}
 
 	@Override
-	public void visit(SendMessageAllReader reader, Context context) {
+	public void visit(SendMessageAllReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		if (!context.isConnected()) {
 			context.closeContext();
@@ -51,7 +51,7 @@ public class ServerDatagramVisitor implements DatagramVisitor<Context> {
 	}
 
 	@Override
-	public void visit(ErrorCodeReader reader, Context context) {
+	public void visit(ErrorCodeReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		if (!context.isConnected()) {
 			context.closeContext();
@@ -60,18 +60,25 @@ public class ServerDatagramVisitor implements DatagramVisitor<Context> {
 	}
 
 	@Override
-	public void visit(TCPAskReader reader, Context context) {
+	public void visit(TCPAskReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
+		if (!context.isConnected()) {
+			context.closeContext();
+		}
 		TCPAsk tcpAsk = reader.get();
 		System.out.println("Received a TCPAsk with the arguments : ");
 		System.out.println("Sender : " + tcpAsk.getSender());
 		System.out.println("Recipient : " + tcpAsk.getRecipient());
 		System.out.println("Password : " + tcpAsk.getPassword());
+		context.broadcast(tcpAsk);
 	}
 	
 	@Override
-	public void visit(TCPDeniedReader reader, Context context) {
+	public void visit(TCPDeniedReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
+		if (!context.isConnected()) {
+			context.closeContext();
+		}
 		TCPDenied tcpDenied = reader.get();
 		System.out.println("Received a TCPDenied with the arguments : ");
 		System.out.println("Sender : " + tcpDenied.getSender());
@@ -80,7 +87,7 @@ public class ServerDatagramVisitor implements DatagramVisitor<Context> {
 	}
 
 	@Override
-	public void visit(TCPConnectReader reader, Context context) {
+	public void visit(TCPConnectReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		TCPConnect tcpConnect = reader.get();
 		System.out.println("Received a TCPDenied with the arguments : ");
@@ -90,7 +97,7 @@ public class ServerDatagramVisitor implements DatagramVisitor<Context> {
 	}
 
 	@Override
-	public void visit(TCPAcceptReader reader, Context context) {
+	public void visit(TCPAcceptReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		TCPAccept tcpAccept = reader.get();
 		System.out.println("Received a TCPDenied with the arguments : ");

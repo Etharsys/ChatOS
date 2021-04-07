@@ -63,6 +63,8 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.Conte
 
 	@Override
 	public void visit(TCPConnectReader reader, Context context) {
+		//On ne devrait jamais arriver ici, on lit le paquet mais on l'ignore
+		//Do nothing
 		TCPConnect tcpConnect = reader.get();
 		System.out.println("Received a TCPDenied with the arguments : ");
 		System.out.println("Sender : " + tcpConnect.getSender());

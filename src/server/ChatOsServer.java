@@ -17,6 +17,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,13 +25,22 @@ import fr.upem.net.chatos.datagram.Datagram;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.MessageAll;
 import fr.upem.net.chatos.datagram.PrivateMessage;
+import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
+import fr.upem.net.chatos.datagram.TCPConnect;
+import fr.upem.net.chatos.datagram.TCPDatagram;
+import fr.upem.net.chatos.datagram.TCPDenied;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 
 
 public class ChatOsServer {
-	public class Context {
+	private interface Context {
+		void doRead() throws IOException;
+		void doWrite() throws IOException;
+	}
+	
+	public class ChatContext implements Context{
         final private SelectionKey key;
         final private SocketChannel sc;
         final private ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
@@ -46,7 +56,7 @@ public class ChatOsServer {
         
         private boolean closed;
         
-        private Context(ChatOsServer server, SelectionKey key){
+        private ChatContext(ChatOsServer server, SelectionKey key){
             this.key = key;
             this.sc = (SocketChannel) key.channel();
             this.server = server;
@@ -58,6 +68,8 @@ public class ChatOsServer {
          */
         private void queueDatagram(Datagram datagram) {
         	queue.add(datagram);
+        	System.out.println("added : " + datagram);
+        	login.ifPresent(s -> System.out.println("to : " + s));
         	updateInterestOps();
         }
         
@@ -78,12 +90,13 @@ public class ChatOsServer {
         public void broadcast(TCPAsk message) {
         	if (!message.getSender().equals(login.get())) {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
+        		queueDatagram(new TCPDenied(message.getSender(), message.getRecipient(), message.getPassword()));
         		return;
         	}
-        	if (server.broadcast(message)) {
-        		queueDatagram(new ErrorCode(ErrorCode.OK));
-        	} else {
-        		queueDatagram(new ErrorCode(ErrorCode.UNREACHABLE_USER));
+        	var code = server.broadcast(message);
+        	queueDatagram(new ErrorCode(code));
+        	if (code != ErrorCode.OK) {
+        		queueDatagram(new TCPDenied(message.getSender(), message.getRecipient(), message.getPassword()));
         	}
         }
         
@@ -99,11 +112,7 @@ public class ChatOsServer {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
         		return;
         	}
-        	if (server.broadcast(message, message.getRecipient())) {
-        		queueDatagram(new ErrorCode(ErrorCode.OK));
-        	} else {
-        		queueDatagram(new ErrorCode(ErrorCode.UNREACHABLE_USER));
-        	}
+    		queueDatagram(new ErrorCode(server.broadcast(message)));
         }
         
         public void closeContext() {
@@ -138,6 +147,7 @@ public class ChatOsServer {
         		silentlyClose();
         		return;
         	}
+        	System.out.println(queue.size());
         	key.interestOps(intOps);
         }
         
@@ -157,7 +167,8 @@ public class ChatOsServer {
          *
          * @throws IOException
          */
-        private void doRead() throws IOException {
+        @Override
+        public void doRead() throws IOException {
         	if (sc.read(bbin) == -1) {
         		closed = true;
         	}
@@ -198,7 +209,6 @@ public class ChatOsServer {
 				var bb = optBB.get();
 				if (bb.remaining() <= bbout.remaining()) {
 					queue.remove();
-					System.out.println(bb);
 					bbout.put(bb);
 				} else {
 					break;
@@ -214,39 +224,271 @@ public class ChatOsServer {
          *
          * @throws IOException
          */
-        private void doWrite() throws IOException {
+        @Override
+        public void doWrite() throws IOException {
         	processOut();
         	bbout.flip();
-        	System.out.println("Sending message : " + bbout);
         	sc.write(bbout);
         	bbout.compact();
         	updateInterestOps();
         }
 	}
 	
+	/*--------------------TCP RELATED PART-------------------------*/
 	//TODO
-	public class TCPContext {
-		final private SelectionKey key;
-        final private SocketChannel sc;
-        final private ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
-        final private ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
+	private class TCPContext implements Context{
+		
+		private Optional<TCPContext> pairedContext = Optional.empty();
+		private final Queue<ByteBuffer> otherQueue = new LinkedList<>();
+		
+		private final SelectionKey key;
+		private final SocketChannel sc;
+		private final ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
+		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
         
-        private boolean isConnected;
+		private boolean closed;
         
         public TCPContext(SelectionKey key, SocketChannel sc) {
         	System.out.println("Creating TCPContext");
-        	
 			Objects.requireNonNull(key);
 			Objects.requireNonNull(sc);
 			this.key = key;
 			this.sc = sc;
+			key.attach(this);
+		}
+        
+        private void updateInterestOps() {
+        	int intOps = 0;
+        	if (!closed && bbin.hasRemaining()) {
+        		intOps |= SelectionKey.OP_READ;
+        	}
+        	if (bbout.position() > 0 || (pairedContext.isPresent() && pairedContext.get().otherQueue.size() != 0)){
+        		intOps |= SelectionKey.OP_WRITE;
+        	}
+        	if (intOps == 0) {
+        		silentlyClose();
+        		return;
+        	}
+        	key.interestOps(intOps);
+        }
+        
+        public void setPairedContext(TCPContext pairedContext) {
+        	if (this.pairedContext.isPresent()) {
+        		throw new IllegalStateException("Already paired");
+        	}
+			this.pairedContext = Optional.of(pairedContext);
+		}
+        
+        private void silentlyClose() {
+            try {
+                sc.close();
+            } catch (IOException e) {
+                // ignore exception
+            }
+        }
+
+		@Override
+		public void doRead() throws IOException {
+			// TODO Auto-generated method stub
+			
+		}
+
+		@Override
+		public void doWrite() throws IOException {
+			// TODO Auto-generated method stub
+			
 		}
 	}
 	
+	/**
+	 * 
+	 * Class representing a TCP protocole message.
+	 */
+	private class TCPKey {
+		private final String sender;
+		private final String recipient;
+		private final short password;
+		
+		public TCPKey(String sender, String recipient, short password) {
+			Objects.requireNonNull(sender);
+			Objects.requireNonNull(recipient);
+			this.sender = sender;
+			this.recipient = recipient;
+			this.password = password;
+		}
+		
+		@Override
+		public boolean equals(Object obj) {
+			if (!(obj instanceof TCPKey)){
+				return false;
+			}
+			var tcpKey = (TCPKey) obj;
+			return password == tcpKey.password
+					&& sender.equals(tcpKey.sender)
+					&& recipient.equals(tcpKey.recipient);
+		}
+	}
+	
+	/**
+	 * 
+	 * Class representing and ongoing TCP connection protocol waiting for both sides to connect
+	 */
+	private class TCPLink {
+		private Optional<TCPContext> senderContext = Optional.empty();
+		private Optional<TCPContext> recipientContext = Optional.empty();
+		
+		public boolean bothConnected(){
+			return senderContext.isPresent() && recipientContext.isPresent();
+		}
+		
+		public boolean connectSenderContext(SelectionKey key, SocketChannel sc) {
+			if (senderContext.isPresent()) {
+				return false;
+			}
+			var context = new TCPContext(key, sc);
+			senderContext = Optional.of(context);
+			context.bbout.put((new ErrorCode(ErrorCode.OK)).toByteBuffer(logger).get());
+			return true;
+		}
+		
+		public boolean connectRecipientContext(SelectionKey key, SocketChannel sc) {
+			if (recipientContext.isPresent()) {
+				return false;
+			}
+			var context = new TCPContext(key, sc);
+			recipientContext = Optional.of(context);
+			context.bbout.put((new ErrorCode(ErrorCode.OK)).toByteBuffer(logger).get());
+			return true;
+		}
+		
+		public void close() {
+			senderContext.ifPresent((c) -> c.silentlyClose());
+			recipientContext.ifPresent((c) -> c.silentlyClose());
+		}
+		
+		public void connect() {
+			if (!bothConnected()) {
+				throw new IllegalStateException("Missing connections");
+			}
+			senderContext.get().pairedContext = recipientContext;
+			recipientContext.get().pairedContext = senderContext;
+		}
+	}
+	
+    /**
+     * Add a new pair TCPKey/TCPLink to the map if possible
+     * @param message the message to send
+     * @return TCP_IN_PROTOCOLE if the key is already in the map (duplicated request) 
+     * UNREACHABLE USER if the recipient is not connected, OK otherwise
+     */
+    public byte broadcast(TCPAsk message) {
+    	
+    	Objects.requireNonNull(message);
+    	if (!clientLoginMap.containsKey(message.getRecipient())) {
+    		System.out.println("UNREACHABLE");
+    		return ErrorCode.UNREACHABLE_USER;
+    	}
+    	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
+		if (waitingTCPConnections.containsKey(key)) {
+			System.out.println("IN_PROTOCOLE");
+			return ErrorCode.TCP_IN_PROTOCOLE;//TODO
+		}
+		waitingTCPConnections.put(key, new TCPLink());
+		clientLoginMap.get(message.getRecipient()).queueDatagram(message);
+    	return ErrorCode.OK;
+	}
+    
+    /**
+     * Remove the pair TCPKey/TCPLink if it exists.
+     * @param message the message to convey
+     * @return  TCP_IN_PROTOCOLE if the key is not in the map (request not initiated)
+     * UNREACHABLE USER if the recipient is not connected and OK otherwise
+     */
+    public byte broadcast(TCPDenied message) {
+    	Objects.requireNonNull(message);
+    	if (!clientLoginMap.containsKey(message.getSender())) {
+    		return ErrorCode.UNREACHABLE_USER;
+    	}
+    	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
+    	if (!waitingTCPConnections.containsKey(key)) {
+    		return ErrorCode.TCP_NOT_IN_PROTOCOLE;
+    	}
+    	clientLoginMap.get(message.getSender()).queueDatagram(message);
+    	waitingTCPConnections.remove(key).close();
+    	return ErrorCode.OK;
+    }
+    
+    private byte acceptConnection(TCPDatagram message, ChatContext context, Consumer<TCPKey> consumer) {
+    	if (!clientLoginMap.containsKey(message.getSender())) {
+    		return ErrorCode.UNREACHABLE_USER;
+    	}
+    	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
+    	if (!waitingTCPConnections.containsKey(key)) {
+    		return ErrorCode.TCP_NOT_IN_PROTOCOLE;
+    	}
+    	consumer.accept(key);
+    	return ErrorCode.OK;
+    }
+    
+    /**
+     * 
+     * @param message the message TCPAccept
+     * @param context the context to change to change to TCPContext
+     * @return
+     */
+    public byte broadcast(TCPAccept message, ChatContext context) {
+    	Objects.requireNonNull(message);
+    	Objects.requireNonNull(context);
+    	//TODO send error
+    	return acceptConnection(message, context, (key) -> {
+    		clientLoginMap.get(message.getSender()).queueDatagram(message);
+        	var link = waitingTCPConnections.get(key);
+        	link.connectRecipientContext(context.key, context.sc);
+        	if (link.bothConnected()) {
+        		link.connect();
+        		waitingTCPConnections.remove(key);
+        	}
+    	});
+    	/*
+    	if (!clientLoginMap.containsKey(message.getSender())) {
+    		return ErrorCode.UNREACHABLE_USER;
+    	}
+    	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
+    	if (!waitingTCPConnections.containsKey(key)) {
+    		return ErrorCode.TCP_NOT_IN_PROTOCOLE;
+    	}
+    	clientLoginMap.get(message.getSender()).queueDatagram(message);
+    	var link = waitingTCPConnections.get(key);
+    	link.connectRecipientContext(context.key, context.sc);
+    	if (link.bothConnected()) {
+    		link.connect();
+    		waitingTCPConnections.remove(key);
+    	}
+    	return ErrorCode.OK;
+    	*/
+    }
+    
+    public byte broadcast(TCPConnect message, ChatContext context) {
+    	Objects.requireNonNull(message);
+    	Objects.requireNonNull(context);
+    	return acceptConnection(message, context, (key) -> {
+        	var link = waitingTCPConnections.get(key);
+        	link.connectSenderContext(context.key, context.sc);
+        	if (link.bothConnected()) {
+        		link.connect();
+        		waitingTCPConnections.remove(key);
+        	}
+    	});
+    }
+	
+	private final HashMap<TCPKey, TCPLink> waitingTCPConnections = new HashMap<>();
+	
+	
+	/*-----------------------END OF TCP RELATED PART------------------------*/
     static private int BUFFER_SIZE = 1_024;
     static private Logger logger = Logger.getLogger(ChatOsServer.class.getName());
 
-    private final HashMap<String, Context> clientLoginMap = new HashMap<>();
+    private final HashMap<String, ChatContext> clientLoginMap = new HashMap<>();
     private final ServerSocketChannel serverSocketChannel;
     private final Selector selector;
 	
@@ -260,7 +502,7 @@ public class ChatOsServer {
      * Add the pair pseudonym/context to the map only if the key is not in the map
      * @return true is the pseudonym is available
      */
-    public boolean requestPseudonymAndAdd(String pseudo, Context context) {
+    public boolean requestPseudonymAndAdd(String pseudo, ChatContext context) {
     	if (clientLoginMap.containsKey(pseudo)) {
     		return false;
     	}
@@ -276,35 +518,28 @@ public class ChatOsServer {
      * @param recipient String representing the recipient
      * @return if the recipient is connected to the server
      */
-    public boolean broadcast(PrivateMessage message, String recipient) {
+    public byte broadcast(PrivateMessage message) {
     	Objects.requireNonNull(message);
-    	Objects.requireNonNull(recipient);
-    	if (!clientLoginMap.containsKey(recipient)) {
-    		return false;
+    	if (!clientLoginMap.containsKey(message.getRecipient())) {
+    		return ErrorCode.UNREACHABLE_USER;
     	} else {
-    		var context = clientLoginMap.get(recipient);
+    		var context = clientLoginMap.get(message.getRecipient());
     		context.queueDatagram(message);
-    		return true;
+    		return ErrorCode.OK;
     	}
     }
-    
-    public boolean broadcast(TCPAsk message) {
-		
-		// TODO Auto-generated method stub
-    	return false;
-	}
     /**
      * Broadcast a message to every person connected with the exception of the sender
      * 
      * @param message the message to broadcast
      * @param sender SelectionKey of the sender 
      */
-    public void broadcast(MessageAll message, Context sender) {
+    public void broadcast(MessageAll message, ChatContext sender) {
     	Objects.requireNonNull(message);
     	Objects.requireNonNull(sender);
     	for (SelectionKey key : selector.keys()) {
     		if (key.isValid() && !key.isAcceptable() && !key.equals(sender.key)) {
-    			var context = (Context) key.attachment();
+    			var context = (ChatContext) key.attachment();
     			context.queueDatagram(message);
     		}
     	}
@@ -345,7 +580,7 @@ public class ChatOsServer {
 		} catch (IOException e) {
 			logger.log(Level.INFO,"Connection closed with client due to IOException",e);
 			silentlyClose(key);
-			var login = ((Context)key.attachment()).login;
+			var login = ((ChatContext)key.attachment()).login;
 			if (login.isPresent()) {
 				clientLoginMap.remove(login.get());
 			}
@@ -360,9 +595,8 @@ public class ChatOsServer {
 		}
 		sc.configureBlocking(false);
 		var newKey = sc.register(selector, SelectionKey.OP_READ,ByteBuffer.allocate(BUFFER_SIZE));
-		newKey.attach(new Context(this,newKey));
+		newKey.attach(new ChatContext(this,newKey));
     }
-
     
     private void silentlyClose(SelectionKey key) {
         Channel sc = (Channel) key.channel();

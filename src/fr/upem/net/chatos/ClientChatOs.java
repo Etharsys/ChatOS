@@ -104,7 +104,7 @@ public class ClientChatOs {
 		private void updateInterestOps() {
 			var interesOps=0;
             if (!closed && bbin.hasRemaining()){
-                interesOps=interesOps|SelectionKey.OP_READ;
+                interesOps|=SelectionKey.OP_READ;
             }
             if (bbout.position()!=0){
                 interesOps|=SelectionKey.OP_WRITE;
@@ -132,6 +132,7 @@ public class ClientChatOs {
 		 * @throws IOException when read throws it
 		 */
 		private void doRead() throws IOException {
+			System.out.println("Reading...");
 			if (sc.read(bbin) == -1) {
 				closed = true;
 			}
@@ -149,17 +150,6 @@ public class ClientChatOs {
 			bbout.compact();
 			processOut();
 			updateInterestOps();
-		}
-		
-		/**
-		 * @brief perform a connexion request to the server, destroy this client if refused
-		 * @throws IOException when finishConnect throws it
-		 */
-		private void doConnect() throws IOException {
-			if (sc.finishConnect()) {
-				// TODO SEND HERE A CONNEXION REQUEST AND WAIT FOR THE ANSWER ! IF REFUSED CANCEL EVERYTHING
-				key.interestOps(SelectionKey.OP_READ);
-			}
 		}
 	}
 	
@@ -259,42 +249,42 @@ public class ClientChatOs {
 	 * @brief process the first command in commandQueue
 	 */
 	private void processCommands() {
-		if (commandQueue.isEmpty())
-			return;
-		var command = commandQueue.poll();
-		
-		Datagram datagram;
-		if (!command.startsWith("@") && !command.startsWith("/")) {
-			datagram = new MessageAll(login, command);
-		} else {
-			if (command.startsWith("@")) {
-				var type = command.split(" ",2);
-				if (type.length != 2) {
-					System.out.println("not enough args");
-				}
-				datagram = new PrivateMessage(login,type[0].substring(1), type[1]);
+		while (!commandQueue.isEmpty()) {
+			var command = commandQueue.poll();
+			
+			Datagram datagram;
+			if (!command.startsWith("@") && !command.startsWith("/")) {
+				datagram = new MessageAll(login, command);
 			} else {
-				//TCP le pas beau a faire
-				var type = command.split(" ",2);
-				if (type.length != 2) {
-					System.out.println("not enough args");
-				}
-				var recipient = type[0].substring(1);
-				if (TCPCommandMap.containsKey(recipient)) {
-					//Le TCPContext existe déja ou est en cours de création.
-					TCPCommandMap.get(recipient).add(type[1]);
-					return;
+				if (command.startsWith("@")) {
+					var type = command.split(" ",2);
+					if (type.length != 2) {
+						System.out.println("not enough args");
+					}
+					datagram = new PrivateMessage(login,type[0].substring(1), type[1]);
 				} else {
-					//Le TCPContext n'a pas encore été demandé pour ce destinataire -> on le crée
-					var list = new ArrayList<String>();
-					list.add(type[1]);
-					TCPCommandMap.put(recipient, list);
-					//TODO random short & save it
-					datagram = new TCPAsk(login, recipient,(short) 1);
+					//TCP le pas beau a faire
+					var type = command.split(" ",2);
+					if (type.length != 2) {
+						System.out.println("not enough args");
+					}
+					var recipient = type[0].substring(1);
+					if (TCPCommandMap.containsKey(recipient)) {
+						//Le TCPContext existe déja ou est en cours de création.
+						TCPCommandMap.get(recipient).add(type[1]);
+						return;
+					} else {
+						//Le TCPContext n'a pas encore été demandé pour ce destinataire -> on le crée
+						var list = new ArrayList<String>();
+						list.add(type[1]);
+						TCPCommandMap.put(recipient, list);
+						//TODO random short & save it
+						datagram = new TCPAsk(login, recipient,(short) 1);
+					}
 				}
 			}
+			uniqueContext.queueCommand(datagram);
 		}
-		uniqueContext.queueCommand(datagram);
 	}
 	
 	/* ----------------------------------------------------------------- */
@@ -360,7 +350,7 @@ public class ClientChatOs {
 		}
 		
 		sc.configureBlocking(false);
-		var key = sc.register(selector, SelectionKey.OP_CONNECT);
+		var key = sc.register(selector, SelectionKey.OP_READ);
 		uniqueContext = new Context(key);
 		key.attach(uniqueContext);
 		 
@@ -383,9 +373,6 @@ public class ClientChatOs {
 	 */
 	private void treatKey(SelectionKey key) {
         try {
-            if (key.isValid() && key.isConnectable()) {
-                uniqueContext.doConnect();
-            }
             if (key.isValid() && key.isWritable()) {
                 uniqueContext.doWrite();
             }

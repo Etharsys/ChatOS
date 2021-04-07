@@ -22,7 +22,10 @@ public class OpCodeReader{
 	private final SendPrivateMessageReader SPM = new SendPrivateMessageReader();
 	private final SendMessageAllReader SMA = new SendMessageAllReader();
 	private final ErrorCodeReader ERROR = new ErrorCodeReader();
-	private final TCPAskReader TCP = new TCPAskReader();
+	private final TCPAskReader TCPAsk = new TCPAskReader();
+	private final TCPAcceptReader TCPAccept = new TCPAcceptReader();
+	private final TCPDeniedReader TCPDenied = new TCPDeniedReader();
+	private final TCPConnectReader TCPConnect = new TCPConnectReader();
 	//TODO les autres (TCP)
 	private Optional<DatagramReader<?>> reader = Optional.empty();
 	
@@ -42,10 +45,17 @@ public class OpCodeReader{
 			reader = Optional.of(SMA);
 			break;
 		case TCPASK_CODE:
-			reader = Optional.of(TCP);
+			reader = Optional.of(TCPAsk);
 			break;
 		case TCPACCEPT_CODE:
-			throw new UnsupportedClassVersionError();
+			reader = Optional.of(TCPAccept);
+			break;
+		case TCPDENIED_CODE:
+			reader = Optional.of(TCPDenied);
+			break;
+		case TCPCONNECT_CODE:
+			reader = Optional.of(TCPConnect);
+			break;
 		case ERROR_PACKET_CODE:
 			reader = Optional.of(ERROR);
 			break;

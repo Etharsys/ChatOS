@@ -60,5 +60,6 @@ public class ServerDatagramVisitor implements DatagramVisitor<Context> {
 		System.out.println("Received a TCPAsk with the arguments : ");
 		System.out.println("Sender : " + tcpAsk.getSender());
 		System.out.println("Recipient : " + tcpAsk.getRecipient());
+		System.out.println("Password : " + tcpAsk.getPassword());
 	}
 }

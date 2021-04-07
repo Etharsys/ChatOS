@@ -201,10 +201,28 @@ public class ChatOsServer {
         }
 	}
 	
+	//TODO
+	public class TCPContext {
+		final private SelectionKey key;
+        final private SocketChannel sc;
+        final private ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
+        final private ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
+        
+        private boolean isConnected;
+        
+        public TCPContext(SelectionKey key, SocketChannel sc) {
+        	System.out.println("Creating TCPContext");
+        	
+			Objects.requireNonNull(key);
+			Objects.requireNonNull(sc);
+			this.key = key;
+			this.sc = sc;
+		}
+	}
+	
     static private int BUFFER_SIZE = 1_024;
     static private Logger logger = Logger.getLogger(ChatOsServer.class.getName());
 
-    
     private final HashMap<String, Context> clientLoginMap = new HashMap<>();
     private final ServerSocketChannel serverSocketChannel;
     private final Selector selector;

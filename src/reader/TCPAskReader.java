@@ -6,12 +6,14 @@ import java.util.Objects;
 import fr.upem.net.chatos.datagram.TCPAsk;
 
 public class TCPAskReader implements DatagramReader<TCPAsk> {
-	private enum State {DONE,WAITING_SENDER, WAITING_RECIPIENT,ERROR};
+	private enum State {DONE, WAITING_SENDER, WAITING_RECIPIENT, WAITING_PASSWORD, ERROR};
 	
     private State state = State.WAITING_SENDER;
     private final StringReader stringReader = new StringReader();
+    private final ShortReader shortReader = new ShortReader();
     private String sender;
     private String recipient;
+    private short password;
     
 	@Override
 	public ProcessStatus process(ByteBuffer bb) {
@@ -19,7 +21,12 @@ public class TCPAskReader implements DatagramReader<TCPAsk> {
         if (state== State.DONE || state== State.ERROR) {
             throw new IllegalStateException();
         }
-        var ps = stringReader.process(bb);
+        ProcessStatus ps;
+        if (state == State.WAITING_PASSWORD) {
+        	ps = shortReader.process(bb);
+        } else {
+        	ps = stringReader.process(bb);
+        } 
         switch(ps) {
         case REFILL:
         	return ps;
@@ -35,20 +42,26 @@ public class TCPAskReader implements DatagramReader<TCPAsk> {
         	stringReader.reset();
         	return process(bb);
         }
+        if (state == State.WAITING_RECIPIENT) {
+        	state = State.WAITING_PASSWORD;
+        	recipient = stringReader.get();
+        	return process(bb);
+        }
     	state = State.DONE;
-    	recipient = stringReader.get();
+    	password = shortReader.get();
     	return ProcessStatus.DONE;
 	}
 
 	@Override
 	public TCPAsk get() {
-		return new TCPAsk(sender, recipient);
+		return new TCPAsk(sender, recipient, password);
 	}
 
 	@Override
 	public void reset() {
         state= State.WAITING_SENDER;
         stringReader.reset();
+        shortReader.reset();
 	}
 
 	@Override

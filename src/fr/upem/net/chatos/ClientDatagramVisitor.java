@@ -19,16 +19,14 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.Conte
 
 	@Override
 	public void visit(SendPrivateMessageReader reader, Context context) {
-		// TODO Auto-generated method stub
 		var msg = reader.get();
-		System.out.println(msg.getSender() + " says to you " + msg.getMessage());
+		System.out.println(msg.getSender() + " says to you : " + msg.getMessage());
 	}
 
 	@Override
 	public void visit(SendMessageAllReader reader, Context context) {
-		// TODO Auto-generated method stub
 		var msg = reader.get();
-		System.out.println(msg.getSender() + " says to all " + msg.getMessage());
+		System.out.println(msg.getSender() + " says to all : " + msg.getMessage());
 	}
 
 	@Override
@@ -44,6 +42,7 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.Conte
 		System.out.println("Received a TCPAsk with the arguments : ");
 		System.out.println("Sender : " + tcpAsk.getSender());
 		System.out.println("Recipient : " + tcpAsk.getRecipient());
+		System.out.println("Password : " + tcpAsk.getPassword());
 	}
 
 }

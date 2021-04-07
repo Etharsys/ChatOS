@@ -7,7 +7,10 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -18,6 +21,7 @@ import fr.upem.net.chatos.datagram.Datagram;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.MessageAll;
 import fr.upem.net.chatos.datagram.PrivateMessage;
+import fr.upem.net.chatos.datagram.TCPAsk;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 
@@ -157,7 +161,26 @@ public class ClientChatOs {
 				key.interestOps(SelectionKey.OP_READ);
 			}
 		}
+	}
+	
+	/**
+	 * 
+	 * Context of a TCP connection
+	 */
+	public class TCPContext {
+		private final SelectionKey key;
+		private final SocketChannel sc;
 		
+		private final String recipient;
+		
+		public TCPContext(SelectionKey key, SocketChannel sc, String recipient) {
+			Objects.requireNonNull(key);
+			Objects.requireNonNull(sc);
+			Objects.requireNonNull(recipient);
+			this.key = key;
+			this.sc = sc;
+			this.recipient = recipient;
+		}
 	}
 	
 	/* ----------------------------------------------------------------- */
@@ -168,6 +191,11 @@ public class ClientChatOs {
 	
 	private final Thread                     console;
 	private final ArrayBlockingQueue<String> commandQueue; 
+	
+	/**
+	 * Map of command for TCPContext
+	 */
+	private final HashMap<String,ArrayList<String>> TCPCommandMap = new HashMap<>();
 	
 	private final SocketChannel     sc;
 	private final Selector          selector;
@@ -247,8 +275,23 @@ public class ClientChatOs {
 				datagram = new PrivateMessage(login,type[0].substring(1), type[1]);
 			} else {
 				//TCP le pas beau a faire
-				logger.severe("Not yes implemented");
-				throw new UnsupportedClassVersionError("Not implemented");
+				var type = command.split(" ",2);
+				if (type.length != 2) {
+					System.out.println("not enough args");
+				}
+				var recipient = type[0].substring(1);
+				if (TCPCommandMap.containsKey(recipient)) {
+					//Le TCPContext existe déja ou est en cours de création.
+					TCPCommandMap.get(recipient).add(type[1]);
+					return;
+				} else {
+					//Le TCPContext n'a pas encore été demandé pour ce destinataire -> on le crée
+					var list = new ArrayList<String>();
+					list.add(type[1]);
+					TCPCommandMap.put(recipient, list);
+					//TODO random short & save it
+					datagram = new TCPAsk(login, recipient,(short) 1);
+				}
 			}
 		}
 		uniqueContext.queueCommand(datagram);

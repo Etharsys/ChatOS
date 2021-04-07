@@ -10,7 +10,7 @@ public class StringReader implements Reader<String> {
 	private enum State {DONE,WAITING_INT, WAITING_STRING,ERROR};
 	
     private State state = State.WAITING_INT;
-    private final ShortReader intReader = new ShortReader();
+    private final ShortReader shortReader = new ShortReader();
     private final ByteBuffer internalbb = ByteBuffer.allocate(STRING_SIZE); // write-mode
     private String value;
 
@@ -21,13 +21,13 @@ public class StringReader implements Reader<String> {
             throw new IllegalStateException();
         }
         if (state == State.WAITING_INT) {
-	        var ps = intReader.process(bb);
+	        var ps = shortReader.process(bb);
 	        switch(ps) {
 	        case REFILL:
 	        	return ps;
 	        case DONE:
 	        	state = State.WAITING_STRING;
-	        	int size = intReader.get();
+	        	int size = shortReader.get();
 	        	if (size <= 0 || size > 1024) {
 	        		state = State.ERROR;
 	        		return ProcessStatus.ERROR;
@@ -70,6 +70,6 @@ public class StringReader implements Reader<String> {
     public void reset() {
         state= State.WAITING_INT;
         internalbb.clear().limit(Integer.BYTES);
-        intReader.reset();
+        shortReader.reset();
     }
 }

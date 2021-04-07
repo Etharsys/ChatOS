@@ -7,27 +7,34 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Logger;
 
+import fr.upem.net.chatos.datagram.ConnectionRequest;
+import fr.upem.net.chatos.datagram.Datagram;
+import fr.upem.net.chatos.datagram.ErrorCode;
+import fr.upem.net.chatos.datagram.MessageAll;
+import fr.upem.net.chatos.datagram.PrivateMessage;
+import reader.OpCodeReader;
+import reader.Reader.ProcessStatus;
+
 public class ClientChatOs {
-	
-	static private class Context {
+	public class Context {
 		
 		private final SelectionKey key;
 		private final SocketChannel sc;
 		
-		private final int BUFFER_MAX_SIZE = (BUFFER_SIZE + Short.BYTES) * 3 + 1;
+		private final int BUFFER_MAX_SIZE = (MAX_STRING_SIZE + Short.BYTES) * 3 + 1;
 		
 		private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 		
-		private final Queue<ByteBuffer> queue     = new LinkedList<>();;
-		//Reader here !
+		private final Queue<Datagram> queue = new LinkedList<>();
+		private final OpCodeReader reader = new OpCodeReader();
+		private final ClientDatagramVisitor visitor = new ClientDatagramVisitor();
 		
 		private boolean closed = false;
 		
@@ -45,14 +52,24 @@ public class ClientChatOs {
 		 */
 		private void processIn() {
 			//TODO normalement c'est pas different de ClientChat sauf qu'on a un switch sur le type de message reçu !
+			System.out.println(bbin);
+			for (var ps = reader.process(bbin); ps != ProcessStatus.REFILL; ps = reader.process(bbin)) {
+				if (ps == ProcessStatus.ERROR) {
+					silentlyClose();
+					return;
+				} else {
+					reader.accept(visitor, this);
+					reader.reset();
+				}
+			}
 		}
 		
 		/**
 		 * @brief add a command to the commands queue
 		 * @param bb the command to add
 		 */
-		private void queueCommand(ByteBuffer bb) {
-			queue.add(bb);
+		private void queueCommand(Datagram datagram) {
+			queue.add(datagram);
 			processOut();
 			updateInterestOps();
 		}
@@ -62,10 +79,14 @@ public class ClientChatOs {
 		 */
 		private void processOut() {
 			while (!queue.isEmpty()) {
-				var bb = queue.peek();
+				var datagram = queue.peek();
+				var optBB = datagram.toByteBuffer(logger);
+				if (optBB.isEmpty()) {
+					queue.remove();
+				}
+				var bb = optBB.get();
 				if (bb.remaining() <= bbout.remaining()) {
 					queue.remove();
-					bb.flip();
 					bbout.put(bb);
 				} else {
 					break;
@@ -141,11 +162,9 @@ public class ClientChatOs {
 	
 	/* ----------------------------------------------------------------- */
 	
-	static private int       BUFFER_SIZE = 1_024;
+	static private int       MAX_STRING_SIZE = 1_024;
 	static private Logger    logger      = Logger.getLogger(ClientChatOs.class.getName());
 	static private final int maxLoginLength = 32;
-
-	private final Charset UTF8_CHARSET = Charset.forName("UTF-8");
 	
 	private final Thread                     console;
 	private final ArrayBlockingQueue<String> commandQueue; 
@@ -215,31 +234,93 @@ public class ClientChatOs {
 		if (commandQueue.isEmpty())
 			return;
 		var command = commandQueue.poll();
-		logger.info("adding to queue : " + command + " (" + command.length() + ") from : "
-				+ login + " (" + login.length() + ") ");
-		var bblog = UTF8_CHARSET.encode(login);
-		var bbcom = UTF8_CHARSET.encode(command);
-		if (bbcom.limit() > BUFFER_SIZE) {
-			logger.info("Message exceed the limit (1024), ignoring command");
-			return;
+		
+		Datagram datagram;
+		if (!command.startsWith("@") && !command.startsWith("/")) {
+			datagram = new MessageAll(login, command);
+		} else {
+			if (command.startsWith("@")) {
+				var type = command.split(" ",2);
+				if (type.length != 2) {
+					System.out.println("not enough args");
+				}
+				datagram = new PrivateMessage(login,type[0].substring(1), type[1]);
+			} else {
+				//TCP le pas beau a faire
+				logger.severe("Not yes implemented");
+				throw new UnsupportedClassVersionError("Not implemented");
+			}
 		}
-		var bb = ByteBuffer.allocate(Integer.BYTES * 2 + bbcom.limit() + bblog.limit());
-		bb.putInt(bblog.limit()).put(bblog).putInt(bbcom.limit()).put(bbcom);
-		uniqueContext.queueCommand(bb);
+		uniqueContext.queueCommand(datagram);
 	}
 	
 	/* ----------------------------------------------------------------- */
 	
 	/**
+	 * @throws IOException 
+	 * @brief Initiate connection to the server by performing a blocking TCP connection waiting
+	 * for server approval
+	 */
+	private boolean initiateConnection() throws IOException {
+		/* Create the CR packet */
+		var CR = new ConnectionRequest(login);
+		var optBB = CR.toByteBuffer(logger);
+		if (optBB.isEmpty()) {
+			return false;
+		}
+		sc.write(optBB.get());
+		
+		/* Read the ErrorCode */
+		var bb = ByteBuffer.allocate(2);
+		if (!readFully(sc, bb)) {
+			return false;
+		}
+		bb.flip();
+		if (bb.get() != OpCodeReader.ERROR_PACKET_CODE) {
+			System.out.println("Wrong packet from the server, terminating...");
+			return false;
+		};
+		var err = bb.get();
+		if (err != ErrorCode.OK) {
+			switch(err) {
+			case ErrorCode.PSEUDO_UNAVAILABLE:
+				System.out.println("Pseudo already taken, please retry with another one");
+				break;
+			default:
+				System.out.println("Unkown Error from the server");
+				break;
+			}
+			return false;
+		}
+		System.out.println("Pseudonym was accepted");
+		return true;
+	}
+	
+	
+	static boolean readFully(SocketChannel sc, ByteBuffer bb) throws IOException {
+  		while(bb.hasRemaining()) {
+  			if(sc.read(bb) == -1) {
+  				return false;
+  			}
+  		}
+  		return true;
+  	}
+	/**
 	 * @brief launch the server
 	 * @throws IOException when configureBlocking or connect throws it
 	 */
 	public void launch() throws IOException {
+		/* Initiate connection with the server (waiting for confirmation */
+		sc.connect(serverAddress);
+		if (!initiateConnection()) {
+			return;
+		}
+		
 		sc.configureBlocking(false);
 		var key = sc.register(selector, SelectionKey.OP_CONNECT);
 		uniqueContext = new Context(key);
 		key.attach(uniqueContext);
-		sc.connect(serverAddress); 
+		 
 		
 		console.start();
 		
@@ -299,15 +380,3 @@ public class ClientChatOs {
 	}
 	
 }
-
-
-
-
-/*// c'est le serveur qui parse la commande ->
-char prefix = command.split(" ")[0].charAt(0); 
-switch (prefix) {
-	case '/' : treatPrivateConnexion(command); break;
-	case '@' : treatPrivateMessage(command);   break;
-	default  : treatPublicMessage(command);    break;
-}
-*/

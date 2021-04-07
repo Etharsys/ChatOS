@@ -1,5 +1,6 @@
 package test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.ByteBuffer;
@@ -10,130 +11,104 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import reader.ConnectionRequestReader;
-import reader.DatagramReader;
 import reader.DatagramVisitor;
 import reader.ErrorCodeReader;
-import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 import reader.SendMessageAllReader;
 import reader.SendPrivateMessageReader;
+import reader.TCPAskReader;
 
 
 public class ConnectionRequestReaderTest {
 	private static final Charset UTF_8 = StandardCharsets.UTF_8;
+	private static final int BUFFER_SIZE = 1024;
 	
 	@Tag("ConnectionRequestReader")
 	@Test
 	public void ConnectionRequestShouldReturnRefill() {
-		ByteBuffer bb = ByteBuffer.allocate(Short.BYTES);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.put((byte)1);
 		bb.put((byte)1);
-		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		DatagramReader DR = OCR.get();
-		assert(DR instanceof ConnectionRequestReader);
-		assert(DR.process(bb) == ProcessStatus.REFILL);
+		ConnectionRequestReader cr = new ConnectionRequestReader();
+		assertEquals(ProcessStatus.REFILL,cr.process(bb));
 	}
 	
 	@Tag("ConnectionRequestReader")
 	@Test
 	public void ConnectionRequestShouldReturnDone() {
-		ByteBuffer bb = ByteBuffer.allocate(6);
-		bb.put((byte)1);
-		bb.putShort((short)3);
-		bb.put(UTF_8.encode("abc"));
-		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		DatagramReader DR = OCR.get();
-		assert(DR instanceof ConnectionRequestReader);
-		assert(DR.process(bb) == ProcessStatus.DONE);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
+		bb.putShort((short)3)
+			.put(UTF_8.encode("abc"));
+		ConnectionRequestReader cr = new ConnectionRequestReader();
+		assertEquals(ProcessStatus.DONE,cr.process(bb));
 	}
 	
 	@Tag("ConnectionRequestReader")
 	@Test
 	public void ConnectionRequestShouldNotReadAllTheBuffer() {
-		ByteBuffer bb = ByteBuffer.allocate(10);
-		bb.put((byte)1);
-		bb.putShort((short)3);
-		bb.put(UTF_8.encode("abcefgh"));
-		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		DatagramReader DR = OCR.get();
-		assert(DR instanceof ConnectionRequestReader);
-		assert(DR.process(bb) == ProcessStatus.DONE);
-		assert(bb.hasRemaining());
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
+		var str = "ne doit pas etre lu";
+		bb.putShort((short)3)
+			.put(UTF_8.encode("abc" + str));
+		ConnectionRequestReader cr = new ConnectionRequestReader();
+		assertEquals(ProcessStatus.DONE,cr.process(bb));
+		assertEquals(str,UTF_8.decode(bb.flip()).toString());
 	}
 	
 	@Tag("ConnectionRequestReader")
 	@Test
 	public void ConnectionRequestShouldReturnTheCorrectString() {
-		DatagramVisitor visitor = new DatagramVisitor(){
+		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
 
 			@Override
-			public void visit(ConnectionRequestReader reader) {
+			public void visit(ConnectionRequestReader reader, Void Context) {
 				if(reader.get().equals("abc")) {
-					throw new AssertionError();
+					throw new NullPointerException();
 				}
 			}
 
 			@Override
-			public void visit(SendPrivateMessageReader reader) {
+			public void visit(SendPrivateMessageReader reader, Void Context) {
 			}
 
 			@Override
-			public void visit(SendMessageAllReader reader) {
+			public void visit(SendMessageAllReader reader, Void Context) {
 			}
 			@Override
-			public void visit(ErrorCodeReader reader) {
+			public void visit(ErrorCodeReader reader, Void Context) {
+			}
+
+			@Override
+			public void visit(TCPAskReader tcpAskReader, Void context) {
 			}
 		};
 		
-		ByteBuffer bb = ByteBuffer.allocate(10);
-		bb.put((byte)1);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.putShort((short)3);
 		bb.put(UTF_8.encode("abcefgh"));
-		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		DatagramReader DR = OCR.get();
-		assert(DR instanceof ConnectionRequestReader);
-		assert(DR.process(bb) == ProcessStatus.DONE);
-		assertThrows(AssertionError.class,() -> DR.accept(visitor));
+		ConnectionRequestReader cr = new ConnectionRequestReader();
+		assertEquals(ProcessStatus.DONE,cr.process(bb));
+		assertThrows(NullPointerException.class,() -> cr.accept(visitor,null));
 	}
 	
 	@Tag("ConnectionRequestReader")
 	@Test
 	public void ConnectionRequestShouldResetCorrectly() {
-		DatagramVisitor visitor = new DatagramVisitor(){
-
-			@Override
-			public void visit(ConnectionRequestReader reader) {
-				reader.reset();
-			}
-
-			@Override
-			public void visit(SendPrivateMessageReader reader) {
-			}
-
-			@Override
-			public void visit(SendMessageAllReader reader) {
-			}
-			@Override
-			public void visit(ErrorCodeReader reader) {
-			}
-		};
-		
-		ByteBuffer bb = ByteBuffer.allocate(11);
-		bb.put((byte)1);
+		ByteBuffer bb = ByteBuffer.allocate(BUFFER_SIZE);
 		bb.putShort((short)3);
 		bb.put(UTF_8.encode("abc"));
 		bb.putShort((short)2);
 		bb.put(UTF_8.encode("bc"));
-		var OCR = new OpCodeReader();
-		OCR.process(bb);
-		DatagramReader DR = OCR.get();
-		assert(DR instanceof ConnectionRequestReader);
-		assert(DR.process(bb) == ProcessStatus.DONE);
-		DR.accept(visitor);
-		assert(DR.process(bb) == ProcessStatus.DONE);
+		ConnectionRequestReader cr = new ConnectionRequestReader();
+		assertEquals(ProcessStatus.DONE,cr.process(bb));
+		cr.reset();
+		assertEquals(ProcessStatus.DONE,cr.process(bb));
+	}
+	
+	@Tag("ConnectionRequestReader")
+	@Test
+	public void ConnectionRequestReaderShouldThrowWhenAcceptingTooEarly() {
+		var CR = new ConnectionRequestReader();
+		assertThrows(IllegalStateException.class, ()->CR.get());
 	}
 }

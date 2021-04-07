@@ -1,54 +1,103 @@
 package reader;
 
 import java.nio.ByteBuffer;
+import java.util.Objects;
+import java.util.Optional;
 
-public class OpCodeReader implements Reader<DatagramReader>{
+import reader.Reader.ProcessStatus;
+
+public class OpCodeReader{
+	static public final byte CR_CODE = 1;
+	static public final byte SPM_CODE = 2;
+	static public final byte SMA_CODE = 3;
+	static public final byte TCPASK_CODE = 4;
+	static public final byte ERROR_PACKET_CODE = 6;
+	
 	private enum State {DONE,WAITING,ERROR};
 	private State state = State.WAITING;
-	private ConnectionRequestReader CR = new ConnectionRequestReader();
-	private SendPrivateMessageReader SPM = new SendPrivateMessageReader();
-	private SendMessageAllReader SMA = new SendMessageAllReader();
-	private ErrorCodeReader ERROR = new ErrorCodeReader();
+	private final ConnectionRequestReader CR = new ConnectionRequestReader();
+	private final SendPrivateMessageReader SPM = new SendPrivateMessageReader();
+	private final SendMessageAllReader SMA = new SendMessageAllReader();
+	private final ErrorCodeReader ERROR = new ErrorCodeReader();
+	private final TCPAskReader TCP = new TCPAskReader();
 	//TODO les autres (TCP)
-	private byte code;
+	private Optional<DatagramReader<?>> reader = Optional.empty();
 	
-	@Override
+	private ProcessStatus getReader(ByteBuffer bb) {
+		if (bb.position() == 0) {
+			return ProcessStatus.REFILL;
+		}
+		bb.flip();
+		switch(bb.get()) {
+		case CR_CODE:
+			reader = Optional.of(CR);
+			break;
+		case SPM_CODE:
+			reader = Optional.of(SPM);
+			break;
+		case SMA_CODE:
+			reader = Optional.of(SMA);
+			break;
+		case TCPASK_CODE:
+			reader = Optional.of(TCP);
+		case 5:
+			throw new UnsupportedClassVersionError();
+		case ERROR_PACKET_CODE:
+			reader = Optional.of(ERROR);
+			break;
+		default:
+			return ProcessStatus.ERROR;
+		}
+		bb.compact();
+		return ProcessStatus.DONE;
+	}
+	
 	public ProcessStatus process(ByteBuffer bb) {
+		Objects.requireNonNull(bb);
 		if (state== State.DONE || state== State.ERROR) {
             throw new IllegalStateException();
         }
-		bb.flip();
-		if (!bb.hasRemaining()) {
-			bb.compact();
-			return ProcessStatus.REFILL;
+		if (reader.isPresent()) {
+			var ps = reader.get().process(bb);
+			switch(ps) {
+			case DONE:
+				state = State.DONE;
+				return ps;
+			case ERROR:
+				state = State.ERROR;
+				return ps;
+			case REFILL:
+				return ps;
+			}
+		} else {
+			var ps = getReader(bb);
+			switch(ps) {
+			case DONE:
+				break;
+			case REFILL:
+				return ps;
+			case ERROR:
+				state = State.ERROR;
+				return ProcessStatus.ERROR;
+			}
+			return process(bb);
 		}
-		code = bb.get();
-
-		bb.compact();
-		state = State.DONE;
-		return ProcessStatus.DONE;
+		return ProcessStatus.REFILL;
+	}
+	
+	public <T> void accept(DatagramVisitor<T> visitor, T context) {
+		Objects.requireNonNull(visitor);
+		if (state != State.DONE) {
+			throw new IllegalStateException();
+		}
+		reader.get().accept(visitor, context);
 	}
 
-	@Override
-	public DatagramReader get() {
-		if (state!= State.DONE) {
-            throw new IllegalStateException();
-        }
-		return switch(code) {
-		case 1 -> CR;
-		case 2 -> SPM;
-		case 3 -> SMA;
-		case 4 -> throw new UnsupportedOperationException();
-		case 5 -> throw new UnsupportedOperationException();
-		case 6 -> ERROR;
-		//TODO fault tolerant (ne pas faire AssertionError c'est mal : peut etre une exception custome?)
-		default -> throw new AssertionError();
-		};
-	}
-
-	@Override
 	public void reset() {
 		state = State.WAITING;
+		if (reader.isPresent()) {
+			reader.get().reset();
+			reader = Optional.empty();
+		}
 	}
-
 }

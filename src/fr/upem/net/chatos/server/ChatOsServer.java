@@ -1,4 +1,4 @@
-package server;
+package fr.upem.net.chatos.server;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -29,9 +29,9 @@ import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
 import fr.upem.net.chatos.datagram.TCPDatagram;
+import fr.upem.net.chatos.reader.OpCodeReader;
+import fr.upem.net.chatos.reader.Reader.ProcessStatus;
 import fr.upem.net.chatos.datagram.TCPAbort;
-import reader.OpCodeReader;
-import reader.Reader.ProcessStatus;
 
 
 public class ChatOsServer {
@@ -272,7 +272,7 @@ public class ChatOsServer {
         	pairedContext.get().updateInterestOps();
         }
         
-        //TODO deconnecter l'autre en cas de déconnection de l'un
+        //TODO deconnecter l'autre en cas de dï¿½connection de l'un
         private void updateInterestOps() {
         	int intOps = 0;
         	if (!closed && pairedContext.get().bbout.hasRemaining()) {

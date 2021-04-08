@@ -1,4 +1,4 @@
-package reader;
+package fr.upem.net.chatos.reader;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;

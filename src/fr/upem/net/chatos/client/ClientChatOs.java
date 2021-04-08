@@ -1,4 +1,4 @@
-package fr.upem.net.chatos;
+package fr.upem.net.chatos.client;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -34,8 +34,8 @@ import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
 import fr.upem.net.chatos.datagram.TCPDatagram;
-import reader.OpCodeReader;
-import reader.Reader.ProcessStatus;
+import fr.upem.net.chatos.reader.OpCodeReader;
+import fr.upem.net.chatos.reader.Reader.ProcessStatus;
 
 public class ClientChatOs {
 	private interface Context {
@@ -513,14 +513,14 @@ public class ClientChatOs {
 					}
 					var recipient = type[0].substring(1);
 					if (TCPCommandMap.containsKey(recipient)) {
-						//Le TCPContext existe déja ou est en cours de création.
+						//Le TCPContext existe dï¿½ja ou est en cours de crï¿½ation.
 						TCPCommandMap.get(recipient).add(type[1]);
 						if (TCPContextMap.containsKey(recipient)) {
 							TCPContextMap.get(recipient).updateInterestOps();
 						}
 						return;
 					} else {
-						//Le TCPContext n'a pas encore été demandé pour ce destinataire -> on le crée
+						//Le TCPContext n'a pas encore ï¿½tï¿½ demandï¿½ pour ce destinataire -> on le crï¿½e
 						var list = new LinkedList<String>();
 						list.add(type[1]);
 						TCPCommandMap.put(recipient, list);

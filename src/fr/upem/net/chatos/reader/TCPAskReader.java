@@ -1,4 +1,4 @@
-package reader;
+package fr.upem.net.chatos.reader;
 
 import fr.upem.net.chatos.datagram.TCPAsk;
 

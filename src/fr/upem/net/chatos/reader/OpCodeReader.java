@@ -1,10 +1,10 @@
-package reader;
+package fr.upem.net.chatos.reader;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
 import java.util.Optional;
 
-import reader.Reader.ProcessStatus;
+import fr.upem.net.chatos.reader.Reader.ProcessStatus;
 
 public class OpCodeReader{
 	static public final byte CR_CODE           = 1;

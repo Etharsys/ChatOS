@@ -1,4 +1,4 @@
-package test;
+package fr.upem.net.test.chatos;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;

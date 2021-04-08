@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 import java.util.logging.Logger;
 
-import reader.OpCodeReader;
+import fr.upem.net.chatos.reader.OpCodeReader;
 
 public class ErrorCode implements Datagram {
 	static public final byte OK                   = 1;

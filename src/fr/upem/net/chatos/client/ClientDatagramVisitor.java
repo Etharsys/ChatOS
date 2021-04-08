@@ -1,84 +1,60 @@
-package server;
+package fr.upem.net.chatos.client;
 
 import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
+import fr.upem.net.chatos.reader.ConnectionRequestReader;
+import fr.upem.net.chatos.reader.DatagramVisitor;
+import fr.upem.net.chatos.reader.ErrorCodeReader;
+import fr.upem.net.chatos.reader.SendMessageAllReader;
+import fr.upem.net.chatos.reader.SendPrivateMessageReader;
+import fr.upem.net.chatos.reader.TCPAbortReader;
+import fr.upem.net.chatos.reader.TCPAcceptReader;
+import fr.upem.net.chatos.reader.TCPAskReader;
+import fr.upem.net.chatos.reader.TCPConnectReader;
+import fr.upem.net.chatos.client.ClientChatOs.ChatContext;
 import fr.upem.net.chatos.datagram.TCPAbort;
-import reader.ConnectionRequestReader;
-import reader.DatagramVisitor;
-import reader.ErrorCodeReader;
-import reader.SendMessageAllReader;
-import reader.SendPrivateMessageReader;
-import reader.TCPAcceptReader;
-import reader.TCPAskReader;
-import reader.TCPConnectReader;
-import reader.TCPAbortReader;
-import server.ChatOsServer.ChatContext;
 
-public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
+public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatContext>{
+
 	@Override
 	public void visit(ConnectionRequestReader reader, ChatContext context) {
-		// TODO Auto-generated method stub
-		System.out.println("Server received ConnectionRequest with the login : " + reader.get());
-		context.requestPseudonym(reader.get());
+		//On ne devrait jamais arriver ici, on lit le paquet mais on l'ignore
+		//Do nothing
 	}
 
 	@Override
 	public void visit(SendPrivateMessageReader reader, ChatContext context) {
-		// TODO Auto-generated method stub
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
-		var message = reader.get();
-		System.out.println("Server received PrivateMessage with the login : " );
-		System.out.println("from : " + message.getSender());
-		System.out.println("to : " + message.getRecipient());
-		System.out.println(message.getMessage());
-		context.broadcast(message);
+		var msg = reader.get();
+		System.out.println(msg.getSender() + " says to you : " + msg.getMessage());
 	}
 
 	@Override
 	public void visit(SendMessageAllReader reader, ChatContext context) {
-		// TODO Auto-generated method stub
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
-		var message = reader.get();
-		System.out.println("Server received Message to All with the login : " );
-		System.out.println("from : " + message.getSender());
-		System.out.println(message.getMessage());
-		context.broadcast(message);
+		var msg = reader.get();
+		System.out.println(msg.getSender() + " says to all : " + msg.getMessage());
 	}
 
 	@Override
 	public void visit(ErrorCodeReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
-		System.out.println("Received an error with op code : " + reader.get());
+		System.out.println("Received an error " + reader.get());
 	}
 
 	@Override
 	public void visit(TCPAskReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
 		TCPAsk tcpAsk = reader.get();
 		System.out.println("Received a TCPAsk with the arguments : ");
 		System.out.println("Sender : " + tcpAsk.getSender());
 		System.out.println("Recipient : " + tcpAsk.getRecipient());
 		System.out.println("Password : " + tcpAsk.getPassword());
-		context.broadcast(tcpAsk);
+		context.treatTCPAsk(tcpAsk);
 	}
-	
+
 	@Override
 	public void visit(TCPAbortReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
 		TCPAbort tcpDenied = reader.get();
 		System.out.println("Received a TCPDenied with the arguments : ");
 		System.out.println("Sender : " + tcpDenied.getSender());
@@ -88,23 +64,22 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 
 	@Override
 	public void visit(TCPConnectReader reader, ChatContext context) {
-		// TODO Auto-generated method stub
+		//On ne devrait jamais arriver ici, on lit le paquet mais on l'ignore
+		//Do nothing
 		TCPConnect tcpConnect = reader.get();
 		System.out.println("Received a TCPConnect with the arguments : ");
 		System.out.println("Sender : " + tcpConnect.getSender());
 		System.out.println("Recipient : " + tcpConnect.getRecipient());
 		System.out.println("Password : " + tcpConnect.getPassword());
-		context.broadcast(tcpConnect);
 	}
 
 	@Override
 	public void visit(TCPAcceptReader reader, ChatContext context) {
-		// TODO Auto-generated method stub
 		TCPAccept tcpAccept = reader.get();
 		System.out.println("Received a TCPAccept with the arguments : ");
 		System.out.println("Sender : " + tcpAccept.getSender());
 		System.out.println("Recipient : " + tcpAccept.getRecipient());
 		System.out.println("Password : " + tcpAccept.getPassword());
-		context.broadcast(tcpAccept);
+		context.treatTCPAccept(tcpAccept);
 	}
 }

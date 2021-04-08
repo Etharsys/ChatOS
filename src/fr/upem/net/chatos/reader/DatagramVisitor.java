@@ -1,4 +1,4 @@
-package reader;
+package fr.upem.net.chatos.reader;
 
 public interface DatagramVisitor<T> {
 	

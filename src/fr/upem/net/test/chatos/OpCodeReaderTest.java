@@ -1,4 +1,4 @@
-package test;
+package fr.upem.net.test.chatos;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -9,17 +9,17 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-import reader.ConnectionRequestReader;
-import reader.DatagramVisitor;
-import reader.ErrorCodeReader;
-import reader.OpCodeReader;
-import reader.SendMessageAllReader;
-import reader.SendPrivateMessageReader;
-import reader.TCPAcceptReader;
-import reader.TCPAskReader;
-import reader.TCPConnectReader;
-import reader.TCPAbortReader;
-import reader.Reader.ProcessStatus;
+import fr.upem.net.chatos.reader.ConnectionRequestReader;
+import fr.upem.net.chatos.reader.DatagramVisitor;
+import fr.upem.net.chatos.reader.ErrorCodeReader;
+import fr.upem.net.chatos.reader.OpCodeReader;
+import fr.upem.net.chatos.reader.SendMessageAllReader;
+import fr.upem.net.chatos.reader.SendPrivateMessageReader;
+import fr.upem.net.chatos.reader.TCPAbortReader;
+import fr.upem.net.chatos.reader.TCPAcceptReader;
+import fr.upem.net.chatos.reader.TCPAskReader;
+import fr.upem.net.chatos.reader.TCPConnectReader;
+import fr.upem.net.chatos.reader.Reader.ProcessStatus;
 
 class OpCodeReaderTest {
 	private static final Charset UTF_8 = StandardCharsets.UTF_8;

@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
 
-import reader.OpCodeReader;
+import fr.upem.net.chatos.reader.OpCodeReader;
 
 public class MessageAll implements Datagram{
 	private final String sender;

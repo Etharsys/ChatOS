@@ -1,4 +1,4 @@
-package reader;
+package fr.upem.net.chatos.reader;
 
 /**
  * Interface representing datagrams readers able to read datagrams without OpCode

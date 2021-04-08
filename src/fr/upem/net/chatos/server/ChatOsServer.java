@@ -87,6 +87,21 @@ public class ChatOsServer {
         	queueDatagram(new ErrorCode(ErrorCode.OK));
         }
         
+        /**
+         * broadcast a message to a recipient if it is connected
+         * send an ERROR packet to the client "OK" if the recipient is connected and
+         * Unreachable User otherwise
+         * Send back Invalid Pseudonym if the sender is not associated with this context
+         * @param message
+         */
+        public void broadcast(PrivateMessage message) {
+        	if (!message.getSender().equals(login.get())) {
+        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
+        		return;
+        	}
+    		queueDatagram(new ErrorCode(server.broadcast(message)));
+        }
+        
         public void broadcast(TCPAsk message) {
         	if (!message.getSender().equals(login.get())) {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
@@ -107,26 +122,19 @@ public class ChatOsServer {
         	}
         }
         
+        public void broadcast(TCPAbort message) {
+        	if (!message.getRecipient().equals(login.get())) {
+        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
+        		return;
+        	}
+        	queueDatagram(new ErrorCode(server.broadcast(message, this)));
+        }
+        
         public void broadcast(TCPConnect message) {
         	var code = server.broadcast(message, this);
         	if (code != ErrorCode.OK) {
         		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
         	}
-        }
-        
-        /**
-         * broadcast a message to a recipient if it is connected
-         * send an ERROR packet to the client "OK" if the recipient is connected and
-         * Unreachable User otherwise
-         * Send back Invalid Pseudonym if the sender is not associated with this context
-         * @param message
-         */
-        public void broadcast(PrivateMessage message) {
-        	if (!message.getSender().equals(login.get())) {
-        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
-        		return;
-        	}
-    		queueDatagram(new ErrorCode(server.broadcast(message)));
         }
         
         public void closeContext() {
@@ -479,6 +487,16 @@ public class ChatOsServer {
         		waitingTCPConnections.remove(key);
         	}
     	});
+    }
+    
+    public byte broadcast(TCPAbort message, ChatContext context) {
+    	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
+    	if (!waitingTCPConnections.containsKey(key)) {
+    		return ErrorCode.TCP_NOT_IN_PROTOCOLE;
+    	}
+    	clientLoginMap.get(message.getSender()).queueDatagram(message);
+    	waitingTCPConnections.remove(key);
+    	return ErrorCode.OK;
     }
     
     public byte broadcast(TCPConnect message, ChatContext context) {

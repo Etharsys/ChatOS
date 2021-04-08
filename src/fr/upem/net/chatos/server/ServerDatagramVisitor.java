@@ -79,11 +79,12 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 		if (!context.isConnected()) {
 			context.closeContext();
 		}
-		TCPAbort tcpDenied = reader.get();
-		System.out.println("Received a TCPDenied with the arguments : ");
-		System.out.println("Sender : " + tcpDenied.getSender());
-		System.out.println("Recipient : " + tcpDenied.getRecipient());
-		System.out.println("Password : " + tcpDenied.getPassword());
+		TCPAbort tcpAbort = reader.get();
+		System.out.println("Received a TCPAbort with the arguments : ");
+		System.out.println("Sender : " + tcpAbort.getSender());
+		System.out.println("Recipient : " + tcpAbort.getRecipient());
+		System.out.println("Password : " + tcpAbort.getPassword());
+		context.broadcast(tcpAbort);
 	}
 
 	@Override

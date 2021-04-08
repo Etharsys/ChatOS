@@ -13,7 +13,6 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Optional;
@@ -185,6 +184,11 @@ public class ClientChatOs {
 			Objects.requireNonNull(tcpAccept);
 			client.treatTCPAccept(tcpAccept);
 		}
+		
+		public void treatTCPAbort(TCPAbort tcpAbort) {
+			Objects.requireNonNull(tcpAbort);
+			client.treatTCPAbort(tcpAbort);
+		}
 	}
 	
 	private void connectTCP(TCPDatagram request, String recipient, Supplier<TCPDatagram> supplier) {
@@ -214,6 +218,18 @@ public class ClientChatOs {
 	public void treatTCPAccept(TCPAccept tcpAccept) {
 		Objects.requireNonNull(tcpAccept);
 		connectTCP(tcpAccept, tcpAccept.getRecipient(), () -> new TCPConnect(tcpAccept.getSender(),tcpAccept.getRecipient(),tcpAccept.getPassword()));
+	}
+	
+	public void treatTCPAbort(TCPAbort tcpAbort) {
+		Objects.requireNonNull(tcpAbort);
+		if (TCPCommandMap.containsKey(tcpAbort.getRecipient()) || TCPCommandMap.containsKey(tcpAbort.getSender())) {
+			if (TCPCommandMap.remove(tcpAbort.getRecipient()) != null) {
+				System.out.println("TCP connection with " + tcpAbort.getRecipient() + " was aborted");
+			} else {
+				TCPCommandMap.remove(tcpAbort.getSender());
+				System.out.println("TCP connection with " + tcpAbort.getSender() + " was aborted");
+			}
+		}
 	}
 	
 	public class TCPContextWaiter implements Context{
@@ -424,10 +440,6 @@ public class ClientChatOs {
 	private final HashMap<String,Queue<String>> TCPCommandMap = new HashMap<>();
 	private final HashMap<String, TCPContext> TCPContextMap = new HashMap<>();
 	
-	private final HashSet<String> TCPWaitingConnectionsSet = new HashSet<>();
-	
-	
-	
 	private final SocketChannel     sc;
 	private final Selector          selector;
 	private final InetSocketAddress serverAddress;
@@ -526,7 +538,6 @@ public class ClientChatOs {
 						TCPCommandMap.put(recipient, list);
 						//TODO random short & save it
 						datagram = new TCPAsk(login, recipient,(short) 1);
-						TCPWaitingConnectionsSet.add(recipient);
 					}
 				}
 			}

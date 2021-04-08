@@ -55,11 +55,12 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatC
 	@Override
 	public void visit(TCPAbortReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
-		TCPAbort tcpDenied = reader.get();
-		System.out.println("Received a TCPDenied with the arguments : ");
-		System.out.println("Sender : " + tcpDenied.getSender());
-		System.out.println("Recipient : " + tcpDenied.getRecipient());
-		System.out.println("Password : " + tcpDenied.getPassword());
+		TCPAbort tcpAbort = reader.get();
+		System.out.println("Received a TCPAbort with the arguments : ");
+		System.out.println("Sender : " + tcpAbort.getSender());
+		System.out.println("Recipient : " + tcpAbort.getRecipient());
+		System.out.println("Password : " + tcpAbort.getPassword());
+		context.treatTCPAbort(tcpAbort);
 	}
 
 	@Override

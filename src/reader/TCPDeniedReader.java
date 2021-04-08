@@ -1,6 +1,5 @@
 package reader;
 
-import fr.upem.net.chatos.datagram.TCPConnect;
 import fr.upem.net.chatos.datagram.TCPAbort;
 
 public class TCPDeniedReader extends AbstractTCPDatagramReader<TCPAbort> {

@@ -1,7 +1,6 @@
 package reader;
 
 import fr.upem.net.chatos.datagram.TCPAccept;
-import fr.upem.net.chatos.datagram.TCPConnect;
 
 public class TCPAcceptReader extends AbstractTCPDatagramReader<TCPAccept> {
 

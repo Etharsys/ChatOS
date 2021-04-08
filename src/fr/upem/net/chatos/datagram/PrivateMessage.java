@@ -12,6 +12,12 @@ public class PrivateMessage implements Datagram{
 	private final String recipient;
 	private final String message;
 	
+	/**
+	 * PrivateMessage constructor : private message datagram, PrivateMessage packet
+	 * @param sender the pseudo of the message sender
+	 * @param recipient the pseudo of the recipient who will get the message
+	 * @param message the message to send
+	 */
 	public PrivateMessage(String sender, String recipient, String message) {
 		Objects.requireNonNull(sender);
 		Objects.requireNonNull(recipient);
@@ -46,14 +52,26 @@ public class PrivateMessage implements Datagram{
 				.flip());
 	}
 	
+	/**
+	 * @brief get the sender pseudonym
+	 * @return the pseudonym
+	 */
 	public String getSender() {
 		return sender;
 	}
 	
+	/**
+	 * @brief get the recipient pseudonym
+	 * @return the pseudonym
+	 */
 	public String getRecipient() {
 		return recipient;
 	}
 	
+	/**
+	 * @brief get the message to send
+	 * @return the message
+	 */
 	public String getMessage() {
 		return message;
 	}

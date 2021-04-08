@@ -8,8 +8,14 @@ import java.util.logging.Logger;
 abstract class AbstractTCPDatagram implements TCPDatagram{
 	private final String sender;
 	private final String recipient;
-	private final short password;
+	private final short  password;
 	
+	/**
+	 * AbstractTCPDatagram Constructor : super class for datagrams requests
+	 * @param sender pseudo of the sender TCP request
+	 * @param recipient pseudo of the recipient TCP request
+	 * @param password password of this TCP connexion
+	 */
 	AbstractTCPDatagram(String sender, String recipient, short password) {
 		Objects.requireNonNull(sender);
 		Objects.requireNonNull(recipient);
@@ -18,21 +24,36 @@ abstract class AbstractTCPDatagram implements TCPDatagram{
 		this.password = password;
 	}
 	
+	/**
+	 * Get the TCP connexion password
+	 */
 	@Override
 	public short getPassword() {
 		return password;
 	}
 	
+	/**
+	 * Get the recipient pseudo of the TCP Request
+	 */
 	@Override
 	public String getRecipient() {
 		return recipient;
 	}
 	
+	/**
+	 * Get the sender pseudo of the TCP Request
+	 */
 	@Override
 	public String getSender() {
 		return sender;
 	}
 	
+	/**
+	 * @brief transform a TCP request into a bytebuffer
+	 * @param logger for debuging
+	 * @param opCode the request operation code 
+	 * @return the potential bytebuffer of the request
+	 */
 	Optional<ByteBuffer> toByteBuffer(Logger logger, byte opCode) {
 		var bbSend = UTF8_CHARSET.encode(sender);
 		

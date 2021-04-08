@@ -8,6 +8,12 @@ import reader.OpCodeReader;
 
 public class TCPConnect extends AbstractTCPDatagram {
 
+	/**
+	 * TCPConnect constructor : packet TCPAbort datagram
+	 * @param sender the pseudo of the TCP private connexion sender
+	 * @param recipient the pseudo of the TCP private connexion recipient
+	 * @param password the TCP private connexion password
+	 */
 	public TCPConnect(String sender, String recipient, short password) {
 		super(sender, recipient, password);
 	}

@@ -1,0 +1,1 @@
+packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"fr.upem.net.chatos.client"},{"l":"fr.upem.net.chatos.datagram"},{"l":"fr.upem.net.chatos.reader"},{"l":"fr.upem.net.chatos.server"},{"l":"fr.upem.net.test.chatos"}];updateSearchResults();

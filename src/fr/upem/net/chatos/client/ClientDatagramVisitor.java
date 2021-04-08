@@ -37,29 +37,26 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatC
 
 	@Override
 	public void visit(ErrorCodeReader reader, ChatContext context) {
-		// TODO Auto-generated method stub
 		System.out.println("Received an error " + reader.get());
 	}
 
 	@Override
 	public void visit(TCPAskReader reader, ChatContext context) {
-		// TODO Auto-generated method stub
 		TCPAsk tcpAsk = reader.get();
 		System.out.println("Received a TCPAsk with the arguments : ");
-		System.out.println("Sender : " + tcpAsk.getSender());
+		System.out.println("Sender    : " + tcpAsk.getSender());
 		System.out.println("Recipient : " + tcpAsk.getRecipient());
-		System.out.println("Password : " + tcpAsk.getPassword());
+		System.out.println("Password  : " + tcpAsk.getPassword());
 		context.treatTCPAsk(tcpAsk);
 	}
 
 	@Override
 	public void visit(TCPAbortReader reader, ChatContext context) {
-		// TODO Auto-generated method stub
 		TCPAbort tcpAbort = reader.get();
 		System.out.println("Received a TCPAbort with the arguments : ");
-		System.out.println("Sender : " + tcpAbort.getSender());
+		System.out.println("Sender    : " + tcpAbort.getSender());
 		System.out.println("Recipient : " + tcpAbort.getRecipient());
-		System.out.println("Password : " + tcpAbort.getPassword());
+		System.out.println("Password  : " + tcpAbort.getPassword());
 		context.treatTCPAbort(tcpAbort);
 	}
 
@@ -69,18 +66,18 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatC
 		//Do nothing
 		TCPConnect tcpConnect = reader.get();
 		System.out.println("Received a TCPConnect with the arguments : ");
-		System.out.println("Sender : " + tcpConnect.getSender());
+		System.out.println("Sender    : " + tcpConnect.getSender());
 		System.out.println("Recipient : " + tcpConnect.getRecipient());
-		System.out.println("Password : " + tcpConnect.getPassword());
+		System.out.println("Password  : " + tcpConnect.getPassword());
 	}
 
 	@Override
 	public void visit(TCPAcceptReader reader, ChatContext context) {
 		TCPAccept tcpAccept = reader.get();
 		System.out.println("Received a TCPAccept with the arguments : ");
-		System.out.println("Sender : " + tcpAccept.getSender());
+		System.out.println("Sender    : " + tcpAccept.getSender());
 		System.out.println("Recipient : " + tcpAccept.getRecipient());
-		System.out.println("Password : " + tcpAccept.getPassword());
+		System.out.println("Password  : " + tcpAccept.getPassword());
 		context.treatTCPAccept(tcpAccept);
 	}
 }

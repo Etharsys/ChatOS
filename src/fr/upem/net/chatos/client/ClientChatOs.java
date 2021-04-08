@@ -37,31 +37,49 @@ import fr.upem.net.chatos.reader.OpCodeReader;
 import fr.upem.net.chatos.reader.Reader.ProcessStatus;
 
 public class ClientChatOs {
+	
 	private interface Context {
-		void doRead() throws IOException;
-		void doWrite() throws IOException;
+		
+		/**
+		 * @brief read from the socket channel (bbin should be in write mode before and after)
+		 * @throws IOException when read throws it
+		 */
+		void doRead()    throws IOException;
+		
+		/**
+		 * @brief write to the socket channel (bbout should be in write mode before and after)
+		 * @throws IOException when write throws it
+		 */
+		void doWrite()   throws IOException;
+		
+		/**
+		 * @brief proceed the socket channel connexion
+		 * @throws IOException when the keys updates throws it
+		 */
 		void doConnect() throws IOException;
 	}
 	
+	/* ----------------------------------------------------------------- */
+	
 	public class ChatContext implements Context{
 		
-		private final SelectionKey key;
+		private final SelectionKey  key;
 		private final SocketChannel sc;
-		private final ClientChatOs client;
+		private final ClientChatOs  client;
 		
 		private final int BUFFER_MAX_SIZE = (MAX_STRING_SIZE + Short.BYTES) * 3 + 1;
 		
 		private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 		
-		private final Queue<Datagram> queue = new LinkedList<>();
-		private final OpCodeReader reader = new OpCodeReader();
+		private final Queue<Datagram>       queue   = new LinkedList<>();
+		private final OpCodeReader          reader  = new OpCodeReader();
 		private final ClientDatagramVisitor visitor = new ClientDatagramVisitor();
 		
 		private boolean closed = false;
 		
 		/**
-		 * Context contructor
+		 * ChatContext contructor
 		 * @param key the selected key to attach to this context (client)
 		 */
 		private ChatContext(SelectionKey key, ClientChatOs client) {
@@ -144,10 +162,7 @@ public class ClientChatOs {
 			}
 		}
 		
-		/**
-		 * @brief read from the socket channel (bbin should be in write mode before and after)
-		 * @throws IOException when read throws it
-		 */
+		@Override
 		public void doRead() throws IOException {
 			System.out.println("Reading...");
 			if (sc.read(bbin) == -1) {
@@ -156,11 +171,8 @@ public class ClientChatOs {
 			processIn();
 			updateInterestOps();
 		}
-		
-		/**
-		 * @brief write to the socket channel (bbout should be in write mode before and after)
-		 * @throws IOException when write throws it
-		 */
+
+		@Override
 		public void doWrite() throws IOException {
 			bbout.flip();
 			sc.write(bbout);
@@ -175,22 +187,46 @@ public class ClientChatOs {
 			key.interestOps(SelectionKey.OP_READ);
 		}
 		
+		/**
+		 * 
+		 * @brief treat the specific request TCPAsk
+		 * @param tcpAsk the datagram which represent the request
+		 */
 		public void treatTCPAsk(TCPAsk tcpAsk){
 			Objects.requireNonNull(tcpAsk);
 			client.treatTCPAsk(tcpAsk);
 		}
 		
+		/**
+		 * 
+		 * @brief treat the specific request TCPAccept
+		 * @param tcpAccept the datagram which represent the request
+		 */
 		public void treatTCPAccept(TCPAccept tcpAccept) {
 			Objects.requireNonNull(tcpAccept);
 			client.treatTCPAccept(tcpAccept);
 		}
 		
+		/**
+		 * 
+		 * @brief treat the specific request TCPAbort
+		 * @param tcpAbort the datagram which represent the request
+		 */
 		public void treatTCPAbort(TCPAbort tcpAbort) {
 			Objects.requireNonNull(tcpAbort);
 			client.treatTCPAbort(tcpAbort);
 		}
 	}
 	
+	/* ----------------------------------------------------------------- */
+
+	/**
+	 * 
+	 * @brief proceed a private connexion TCP (connect packet handling)
+	 * @param request the datagram representing the TCP private connexion
+	 * @param recipient the pseudonym of the recipient client
+	 * @param supplier a potential copy of the datagram
+	 */
 	private void connectTCP(TCPDatagram request, String recipient, Supplier<TCPDatagram> supplier) {
 		if (TCPCommandMap.containsKey(request.getSender())) {
 			//Already Connected
@@ -209,17 +245,32 @@ public class ClientChatOs {
 		}
 	}
 	
+	/**
+	 * 
+	 * @brief treat the TCPAsk request
+	 * @param tcpAsk the datatgram representing the TCP private connexion
+	 */
 	public void treatTCPAsk(TCPAsk tcpAsk){
 		Objects.requireNonNull(tcpAsk);
 		connectTCP(tcpAsk, tcpAsk.getSender(), () -> new TCPAccept(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()));
 		TCPCommandMap.put(tcpAsk.getSender(), new LinkedList<>());
 	}
 	
+	/**
+	 * 
+	 * @brief treat the TCPAccept request
+	 * @param tcpAccept the datatgram representing the TCP private connexion
+	 */
 	public void treatTCPAccept(TCPAccept tcpAccept) {
 		Objects.requireNonNull(tcpAccept);
 		connectTCP(tcpAccept, tcpAccept.getRecipient(), () -> new TCPConnect(tcpAccept.getSender(),tcpAccept.getRecipient(),tcpAccept.getPassword()));
 	}
 	
+	/**
+	 * 
+	 * @brief treat the TCPAbort request
+	 * @param tcpAbort the datatgram representing the TCP private connexion
+	 */
 	public void treatTCPAbort(TCPAbort tcpAbort) {
 		Objects.requireNonNull(tcpAbort);
 		if (TCPCommandMap.containsKey(tcpAbort.getRecipient()) || TCPCommandMap.containsKey(tcpAbort.getSender())) {
@@ -231,7 +282,9 @@ public class ClientChatOs {
 			}
 		}
 	}
-	
+		
+	/* ----------------------------------------------------------------- */
+
 	public class TCPContextWaiter implements Context{
 		private final String recipient;
 		
@@ -242,6 +295,13 @@ public class ClientChatOs {
 		
 		private boolean closed;
 		
+		/**
+		 * TCPContextWaiter constructor
+		 * @param contextKey the original context key
+		 * @param socket the original socket channel
+		 * @param recipient the pseudonym of the TCP private connexion recipient
+		 * @param buffer the buffer of the TCPDatagram request
+		 */
 		public TCPContextWaiter(SelectionKey contextKey, SocketChannel socket, String recipient, ByteBuffer buffer) {
 			Objects.requireNonNull(contextKey);
 			Objects.requireNonNull(socket);
@@ -252,6 +312,10 @@ public class ClientChatOs {
 			bbout = buffer;
 		}
 		
+		/**
+		 * update the interestOps of the key
+		 * @brief
+		 */
 		private void updateInterestOps() {
         	if (closed) {
         		silentlyClose();
@@ -263,18 +327,11 @@ public class ClientChatOs {
         		contextKey.interestOps(SelectionKey.OP_READ);
         	}
         }
-		
-		@Override
-		public void doRead() throws IOException {
-			System.out.println("coucou");
-			if (socket.read(bbin) == -1) {
-				closed = true;
-        		return;
-        	}
-			updateInterestOps();
-			processIn();
-		}
 
+		/**
+		 * @brief add a command to the commands queue
+		 * @param bb the command to add
+		 */
 		private void processIn() {
 			if (!bbin.hasRemaining()) {
 				bbin.flip();
@@ -295,6 +352,9 @@ public class ClientChatOs {
 			}
 		}
 		
+		/**
+		 * @brief silently close the socket channel
+		 */
 		private void silentlyClose() {
             try {
                 socket.close();
@@ -302,6 +362,17 @@ public class ClientChatOs {
                 // ignore exception
             }
         }
+		
+		@Override
+		public void doRead() throws IOException {
+			System.out.println("coucou");
+			if (socket.read(bbin) == -1) {
+				closed = true;
+        		return;
+        	}
+			updateInterestOps();
+			processIn();
+		}
 
 		@Override
 		public void doConnect() throws IOException {
@@ -322,16 +393,22 @@ public class ClientChatOs {
 		}
 	}
 	
+	
+	/* ----------------------------------------------------------------- */
+	
+	
 	/**
 	 * 
 	 * Context of a TCP connection
 	 */
 	public class TCPContext implements Context{
-		private final static int BUFFER_SIZE = 1024;
-		//TODO
+		private final static int BUFFER_SIZE = 1_024;
+		private final Charset    ASCII       = StandardCharsets.US_ASCII;
+		
 		private final SelectionKey key;
 		private final SocketChannel sc;
-		private final ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
+		
+		private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_SIZE);
 		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
 		
 		private Optional<OpCodeReader> reader = Optional.of(new OpCodeReader());
@@ -340,6 +417,12 @@ public class ClientChatOs {
 		
 		private boolean closed;
 		
+		/**
+		 * TCPContext constructor (TCP private connexion)
+		 * @param key the original context key
+		 * @param socket the original socket channel
+		 * @param recipient the pseudonym of the TCP private connexion recipient
+		 */
 		public TCPContext(SelectionKey key, SocketChannel sc, String recipient) {
 			logger.severe("Created TCP Context");
 			Objects.requireNonNull(key);
@@ -350,6 +433,10 @@ public class ClientChatOs {
 			this.recipient = recipient;
 		}
 		
+		/**
+		 * update the interestOps of the key
+		 * @brief
+		 */
 		private void updateInterestOps() {
         	int intOps = 0;
         	if (!closed && bbin.hasRemaining() && !reader.isEmpty()) {
@@ -366,24 +453,19 @@ public class ClientChatOs {
         	key.interestOps(intOps);
         }
 		
-		private final Charset ASCII = StandardCharsets.US_ASCII;
-		
+		/**
+		 * @brief add a command to the commands queue
+		 * @param bb the command to add
+		 */
 		private void processIn() {
 			bbin.flip();
 			System.out.println("From the TCP connection : " + ASCII.decode(bbin));
 			bbin.clear();
 		}
 
-		@Override
-		public void doRead() throws IOException {
-			// TODO Auto-generated method stub
-			if (sc.read(bbin) == -1) {
-        		closed = true;
-        	}
-			processIn();
-			updateInterestOps();
-		}
-
+		/**
+		 * @brief process the  content of bbout
+		 */
 		private void processOut() {
 			while (TCPCommandMap.get(recipient).size() != 0) {
 				var command = TCPCommandMap.get(recipient).peek();
@@ -396,10 +478,29 @@ public class ClientChatOs {
 				}
 			}
 		}
+		
+		/**
+		 * @brief silently close the socket channel
+		 */
+		private void silentlyClose() {
+            try {
+                sc.close();
+            } catch (IOException e) {
+                // ignore exception
+            }
+        }
+		
+		@Override
+		public void doRead() throws IOException {
+			if (sc.read(bbin) == -1) {
+        		closed = true;
+        	}
+			processIn();
+			updateInterestOps();
+		}
 
 		@Override
 		public void doWrite() throws IOException {
-			// TODO Auto-generated method stub
 			processOut();
 			logger.severe("coucou");
 			bbout.flip();
@@ -410,14 +511,6 @@ public class ClientChatOs {
 			bbout.compact();
 			updateInterestOps();
 		}
-		
-		private void silentlyClose() {
-            try {
-                sc.close();
-            } catch (IOException e) {
-                // ignore exception
-            }
-        }
 
 		@Override
 		public void doConnect() throws IOException {
@@ -428,8 +521,8 @@ public class ClientChatOs {
 	/* ----------------------------------------------------------------- */
 	
 	static private int       MAX_STRING_SIZE = 1_024;
-	static private Logger    logger      = Logger.getLogger(ClientChatOs.class.getName());
-	static private final int maxLoginLength = 32;
+	static private Logger    logger          = Logger.getLogger(ClientChatOs.class.getName());
+	static private final int maxLoginLength  = 32;
 	
 	private final Thread                     console;
 	private final ArrayBlockingQueue<String> commandQueue; 
@@ -438,7 +531,7 @@ public class ClientChatOs {
 	 * Map of command for TCPContext
 	 */
 	private final HashMap<String,Queue<String>> TCPCommandMap = new HashMap<>();
-	private final HashMap<String, TCPContext> TCPContextMap = new HashMap<>();
+	private final HashMap<String, TCPContext>   TCPContextMap = new HashMap<>();
 	
 	private final SocketChannel     sc;
 	private final Selector          selector;
@@ -642,11 +735,6 @@ public class ClientChatOs {
             }
             if (key.isValid() && key.isConnectable()) {
         		((Context)key.attachment()).doConnect();
-//        		if (selector.keys().size() != 1) {
-//        			printKeys();
-//        			printSelectedKey(key);
-//        			throw new NullPointerException();
-//        		}
         	}
         } catch(IOException ioe) {
             throw new UncheckedIOException(ioe);
@@ -674,10 +762,20 @@ public class ClientChatOs {
 		new ClientChatOs(args[0], isa).launch();
 	}
 	
+	/**
+	 * 
+	 * @brief print the usage of the client
+	 */
 	private static void usage() {
 		System.out.println("Usage : ClientChatOs login hostname port");
 	}
 	
+	/**
+	 * 
+	 * @brief get a string format of a key
+	 * @param key the key to parse in a string
+	 * @return the string key
+	 */
 	private String interestOpsToString(SelectionKey key){
 		if (!key.isValid()) {
 			return "CANCELLED";
@@ -685,11 +783,15 @@ public class ClientChatOs {
 		int interestOps = key.interestOps();
 		ArrayList<String> list = new ArrayList<>();
 		if ((interestOps&SelectionKey.OP_ACCEPT)!=0) list.add("OP_ACCEPT");
-		if ((interestOps&SelectionKey.OP_READ)!=0) list.add("OP_READ");
-		if ((interestOps&SelectionKey.OP_WRITE)!=0) list.add("OP_WRITE");
+		if ((interestOps&SelectionKey.OP_READ)!=0)   list.add("OP_READ");
+		if ((interestOps&SelectionKey.OP_WRITE)!=0)  list.add("OP_WRITE");
 		return String.join("|",list);
 	}
 
+	/**
+	 * 
+	 * @brief print the client selectionned keys 
+	 */
 	public void printKeys() {
 		Set<SelectionKey> selectionKeySet = selector.keys();
 		if (selectionKeySet.isEmpty()) {
@@ -708,6 +810,12 @@ public class ClientChatOs {
 		}
 	}
 
+	/**
+	 * 
+	 * @brief get a string format of the remote address of a socket channel
+	 * @param sc the interested socket channel
+	 * @return the string format of the remote address
+	 */
 	private String remoteAddressToString(SocketChannel sc) {
 		try {
 			return sc.getRemoteAddress().toString();
@@ -716,6 +824,11 @@ public class ClientChatOs {
 		}
 	}
 
+	/**
+	 * 
+	 * @brief print a selected key
+	 * @param key the key to print
+	 */
 	public void printSelectedKey(SelectionKey key) {
 		SelectableChannel channel = key.channel();
 		if (channel instanceof ServerSocketChannel) {
@@ -726,14 +839,20 @@ public class ClientChatOs {
 		}
 	}
 
+	/**
+	 * 
+	 * @brief print the possible channel of a key
+	 * @param key the key to examined
+	 * @return a string format of possible actions
+	 */
 	private String possibleActionsToString(SelectionKey key) {
 		if (!key.isValid()) {
 			return "CANCELLED";
 		}
 		ArrayList<String> list = new ArrayList<>();
 		if (key.isAcceptable()) list.add("ACCEPT");
-		if (key.isReadable()) list.add("READ");
-		if (key.isWritable()) list.add("WRITE");
+		if (key.isReadable())   list.add("READ");
+		if (key.isWritable())   list.add("WRITE");
 		return String.join(" and ",list);
 	}
 	

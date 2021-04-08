@@ -105,7 +105,7 @@ public class ClientChatOs {
 		
 		/**
 		 * @brief add a command to the commands queue
-		 * @param bb the command to add
+		 * @param datagram the command to add
 		 */
 		private void queueCommand(Datagram datagram) {
 			queue.add(datagram);

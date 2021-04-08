@@ -35,27 +35,44 @@ import fr.upem.net.chatos.datagram.TCPAbort;
 
 
 public class ChatOsServer {
+	
 	private interface Context {
-		void doRead() throws IOException;
+		
+		/**
+		 * @brief read from the socket channel (bbin should be in write mode before and after)
+		 * @throws IOException when read throws it
+		 */
+		void doRead()  throws IOException;
+		
+		/**
+		 * @brief write to the socket channel (bbout should be in write mode before and after)
+		 * @throws IOException when write throws it
+		 */
 		void doWrite() throws IOException;
 	}
 	
-	public class ChatContext implements Context{
-        final private SelectionKey key;
-        final private SocketChannel sc;
-        final private ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
-        final private ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
+	public class ChatContext implements Context {
+		
+        final private SelectionKey    key;
+        final private SocketChannel   sc;
+        final private ByteBuffer      bbin  = ByteBuffer.allocate(BUFFER_SIZE);
+        final private ByteBuffer      bbout = ByteBuffer.allocate(BUFFER_SIZE);
         final private Queue<Datagram> queue = new LinkedList<>();
-        final private ChatOsServer server;
+        final private ChatOsServer    server;
         
         
         final private ServerDatagramVisitor visitor = new ServerDatagramVisitor();
-        final private OpCodeReader reader = new OpCodeReader();
+        final private OpCodeReader          reader  = new OpCodeReader();
         
         private Optional<String> login = Optional.empty();
         
         private boolean closed;
         
+        /**
+         * ChatContext constructor
+         * @param server the Chat server
+         * @param key the selected key to attach to this context (server)
+         */
         private ChatContext(ChatOsServer server, SelectionKey key){
             this.key = key;
             this.sc = (SocketChannel) key.channel();
@@ -63,8 +80,8 @@ public class ChatOsServer {
         }
         
         /**
-         * Add a datagram to the queue
-         * @param datagram
+         * @brief Add a datagram to the queue
+         * @param datagram the command to add
          */
         private void queueDatagram(Datagram datagram) {
         	queue.add(datagram);
@@ -74,8 +91,7 @@ public class ChatOsServer {
         }
         
         /**
-         * broadcast a message to every client connected
-         * Send back Invalid Pseudonym if the sender is not associated with this context
+         * @brief broadcast a message to every client connected Send back Invalid Pseudonym if the sender is not associated with this context
          * @param message the message to broadcast
          */
         public void broadcast(MessageAll message) {
@@ -88,11 +104,11 @@ public class ChatOsServer {
         }
         
         /**
-         * broadcast a message to a recipient if it is connected
+         * @brief broadcast a message to a recipient if it is connected
          * send an ERROR packet to the client "OK" if the recipient is connected and
          * Unreachable User otherwise
          * Send back Invalid Pseudonym if the sender is not associated with this context
-         * @param message
+         * @param message the message to broadcast
          */
         public void broadcast(PrivateMessage message) {
         	if (!message.getSender().equals(login.get())) {
@@ -102,6 +118,10 @@ public class ChatOsServer {
     		queueDatagram(new ErrorCode(server.broadcast(message)));
         }
         
+        /**
+         * @brief broadcast a TCP private connexion ask request to a recipient
+         * @param message the message to broadcast
+         */
         public void broadcast(TCPAsk message) {
         	if (!message.getSender().equals(login.get())) {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
@@ -115,6 +135,10 @@ public class ChatOsServer {
         	}
         }
         
+        /**
+         * @brief broadcast an acceptation of the TCP private connexion request to a recipient
+         * @param message the message to broadcast
+         */
         public void broadcast(TCPAccept message) {
         	var code = server.broadcast(message, this);
         	if (code != ErrorCode.OK) {
@@ -122,6 +146,10 @@ public class ChatOsServer {
         	}
         }
         
+        /**
+         * @brief broadcast a abortion of the TCP private connexion request to a recipient
+         * @param message the message to broadcast
+         */
         public void broadcast(TCPAbort message) {
         	if (!message.getRecipient().equals(login.get())) {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
@@ -130,6 +158,10 @@ public class ChatOsServer {
         	queueDatagram(new ErrorCode(server.broadcast(message, this)));
         }
         
+        /**
+         * @brief broadcast a TCP private connexion request to a recipient
+         * @param message the message to broadcast
+         */
         public void broadcast(TCPConnect message) {
         	var code = server.broadcast(message, this);
         	if (code != ErrorCode.OK) {
@@ -137,14 +169,28 @@ public class ChatOsServer {
         	}
         }
         
+        /**
+         * 
+         * @brief close the context
+         */
         public void closeContext() {
         	closed = true;
         }
         
+        /**
+         * 
+         * @brief check if a client is connected by checking the presence of his login
+         * @return the presence or not of the login
+         */
         public boolean isConnected() {
         	return login.isPresent();
         }
         
+        /**
+         * 
+         * @brief check is a sender pseudonym is valid in a request
+         * @param pseudo the sender pseudo to check
+         */
         public void requestPseudonym(String pseudo) {
         	if (server.requestPseudonymAndAdd(pseudo, this)) {
         		//Send OK
@@ -157,6 +203,10 @@ public class ChatOsServer {
         	}
         }
         
+        /**
+         * 
+		 * @brief update the interestOps of the key
+		 */
         private void updateInterestOps() {
         	int intOps = 0;
         	if (!closed && bbin.hasRemaining()) {
@@ -172,6 +222,10 @@ public class ChatOsServer {
         	key.interestOps(intOps);
         }
         
+        /**
+         * 
+		 * @brief silently close the socket channel
+		 */
         private void silentlyClose() {
             try {
                 sc.close();
@@ -181,7 +235,7 @@ public class ChatOsServer {
         }
         
         /**
-         * Performs the read action on sc
+         * @brief Performs the read action on sc
          *
          * The convention is that both buffers are in write-mode before the call
          * to doRead and after the call
@@ -198,7 +252,7 @@ public class ChatOsServer {
         }
         
         /**
-         * Process the content of bbin
+         * @brief Process the content of bbin
          *
          * The convention is that bbin is in write-mode before the call
          * to process and after the call
@@ -217,7 +271,7 @@ public class ChatOsServer {
         }
         
         /**
-         * Try to fill bbout from the queue
+         * @brief Try to fill bbout from the queue
          *
          */
         private void processOut() {
@@ -238,7 +292,7 @@ public class ChatOsServer {
         }
 
 		/**	
-         * Performs the write action on sc
+         * @brief Performs the write action on sc
          *
          * The convention is that both buffers are in write-mode before the call
          * to doWrite and after the call
@@ -257,16 +311,21 @@ public class ChatOsServer {
 	
 	/*--------------------TCP RELATED PART-------------------------*/
 	//TODO
-	private class TCPContext implements Context{
+	private class TCPContext implements Context {
 		
 		private Optional<TCPContext> pairedContext = Optional.empty();
 		
-		private final SelectionKey tcpContextKey;
+		private final SelectionKey  tcpContextKey;
 		private final SocketChannel socketChannel;
-		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
+		private final ByteBuffer    bbout = ByteBuffer.allocate(BUFFER_SIZE);
         
 		private boolean closed;
         
+		/**
+		 * TCPContext constructor
+		 * @param tcpContextKey the selected key to attach to this context
+		 * @param socketChannel the original socket channel
+		 */
         public TCPContext(SelectionKey tcpContextKey, SocketChannel socketChannel) {
 			Objects.requireNonNull(tcpContextKey);
 			Objects.requireNonNull(socketChannel);
@@ -275,11 +334,19 @@ public class ChatOsServer {
 			tcpContextKey.attach(this);
 		}
         
+        /**
+         * 
+		 * @brief update the interestOps of the key
+		 */
         private void updateInterests() {
         	updateInterestOps();
         	pairedContext.get().updateInterestOps();
         }
         
+        /**
+         * 
+		 * @brief update the interestOps of the key
+		 */
         //TODO deconnecter l'autre en cas de d�connection de l'un
         private void updateInterestOps() {
         	int intOps = 0;
@@ -296,6 +363,11 @@ public class ChatOsServer {
         	tcpContextKey.interestOps(intOps);
         }
         
+        /**
+         * 
+         * @brief set a link of the TCP private connexion between this context and an other
+         * @param pairedContext the second context to link
+         */
         public void setPairedContext(TCPContext pairedContext) {
         	if (this.pairedContext.isPresent()) {
         		throw new IllegalStateException("Already paired");
@@ -303,6 +375,10 @@ public class ChatOsServer {
 			this.pairedContext = Optional.of(pairedContext);
 		}
         
+        /**
+         * 
+		 * @brief silently close the socket channel
+		 */
         private void silentlyClose() {
             try {
                 socketChannel.close();
@@ -339,8 +415,14 @@ public class ChatOsServer {
 	private class TCPKey {
 		private final String sender;
 		private final String recipient;
-		private final short password;
+		private final short  password;
 		
+		/**
+		 * TCPKey constructor
+		 * @param sender the pseudonym of the sender client
+		 * @param recipient the pseudonym of the recipient client
+		 * @param password the TCP private connexion password
+		 */
 		public TCPKey(String sender, String recipient, short password) {
 			Objects.requireNonNull(sender);
 			Objects.requireNonNull(recipient);
@@ -371,13 +453,25 @@ public class ChatOsServer {
 	 * Class representing and ongoing TCP connection protocol waiting for both sides to connect
 	 */
 	private class TCPLink {
-		private Optional<TCPContext> senderContext = Optional.empty();
+		private Optional<TCPContext> senderContext    = Optional.empty();
 		private Optional<TCPContext> recipientContext = Optional.empty();
 		
+		/**
+		 * 
+		 * @brief check if a the both client in a TCP private connexion are present
+		 * @return if the both client are present
+		 */
 		public boolean bothConnected(){
 			return senderContext.isPresent() && recipientContext.isPresent();
 		}
 		
+		/**
+		 * 
+		 * @brief connect the sender to this context
+		 * @param key the context seleted key
+		 * @param sc the context socket channel
+		 * @return if the connexion is set (false if the sender is already connected / present)
+		 */
 		public boolean connectSenderContext(SelectionKey key, SocketChannel sc) {
 			if (senderContext.isPresent()) {
 				return false;
@@ -388,6 +482,13 @@ public class ChatOsServer {
 			return true;
 		}
 		
+		/**
+		 * 
+		 * @brief connect the recipient to this context
+		 * @param key the context selected key
+		 * @param sc the context selcket channel
+		 * @return if the connexion is set (false if the recipient is already connected/ present)
+		 */
 		public boolean connectRecipientContext(SelectionKey key, SocketChannel sc) {
 			if (recipientContext.isPresent()) {
 				return false;
@@ -398,11 +499,19 @@ public class ChatOsServer {
 			return true;
 		}
 		
+		/**
+		 * 
+		 * @brief close the sender & the recipient sockets channels
+		 */
 		public void close() {
 			senderContext.ifPresent((c) -> c.silentlyClose());
 			recipientContext.ifPresent((c) -> c.silentlyClose());
 		}
 		
+		/**
+		 * 
+		 * @brief connect sender and recipient each other
+		 */
 		public void connect() {
 			if (!bothConnected()) {
 				throw new IllegalStateException("Missing connections");
@@ -414,8 +523,11 @@ public class ChatOsServer {
 		}
 	}
 	
+	
+	private final HashMap<TCPKey, TCPLink> waitingTCPConnections = new HashMap<>();
+	
     /**
-     * Add a new pair TCPKey/TCPLink to the map if possible
+     * @brief Add a new pair TCPKey/TCPLink to the map if possible
      * @param message the message to send
      * @return TCP_IN_PROTOCOLE if the key is already in the map (duplicated request) 
      * UNREACHABLE USER if the recipient is not connected, OK otherwise
@@ -438,7 +550,7 @@ public class ChatOsServer {
 	}
     
     /**
-     * Remove the pair TCPKey/TCPLink if it exists.
+     * @brief Remove the pair TCPKey/TCPLink if it exists.
      * @param message the message to convey
      * @return  TCP_IN_PROTOCOLE if the key is not in the map (request not initiated)
      * UNREACHABLE USER if the recipient is not connected and OK otherwise
@@ -457,6 +569,14 @@ public class ChatOsServer {
     	return ErrorCode.OK;
     }
     
+    /**
+     * 
+     * @brief accept the connexion of a TCP private connexion
+     * @param message the datagram request
+     * @param context the concerned context
+     * @param consumer the selected key (TCPKey on a consumer)
+     * @return the ErrorCode in terms of some tests
+     */
     private byte acceptConnection(TCPDatagram message, ChatContext context, Consumer<TCPKey> consumer) {
     	if (!clientLoginMap.containsKey(message.getSender())) {
     		return ErrorCode.UNREACHABLE_USER;
@@ -470,10 +590,10 @@ public class ChatOsServer {
     }
     
     /**
-     * 
+     * @brief broadcast a message (TCPAccept) to the context
      * @param message the message TCPAccept
-     * @param context the context to change to change to TCPContext
-     * @return
+     * @param context the context to change to TCPContext
+     * @return the ErrorCode calculated
      */
     public byte broadcast(TCPAccept message, ChatContext context) {
     	Objects.requireNonNull(message);
@@ -489,6 +609,13 @@ public class ChatOsServer {
     	});
     }
     
+    /**
+     * 
+     * @brief broadcast a message (TCPAbort) to the context
+     * @param message the message TCPAbort
+     * @param context the concerned context
+     * @return the calculated ErrorCode
+     */
     public byte broadcast(TCPAbort message, ChatContext context) {
     	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
     	if (!waitingTCPConnections.containsKey(key)) {
@@ -499,6 +626,13 @@ public class ChatOsServer {
     	return ErrorCode.OK;
     }
     
+    /**
+     * 
+     * @brief broadcast a message (TCPConnect) to the context
+     * @param message the message TCPConnect
+     * @param context the concerned context
+     * @return the calculated ErrorCode
+     */
     public byte broadcast(TCPConnect message, ChatContext context) {
     	Objects.requireNonNull(message);
     	Objects.requireNonNull(context);
@@ -513,10 +647,10 @@ public class ChatOsServer {
     	});
     }
 	
-	private final HashMap<TCPKey, TCPLink> waitingTCPConnections = new HashMap<>();
-	
 	
 	/*-----------------------END OF TCP RELATED PART------------------------*/
+	
+	
     static private int BUFFER_SIZE = 1_024;
     static private Logger logger = Logger.getLogger(ChatOsServer.class.getName());
 
@@ -531,8 +665,8 @@ public class ChatOsServer {
     }
 
 	/**
-     * Add the pair pseudonym/context to the map only if the key is not in the map
-     * @return true is the pseudonym is available
+     * @brief Add the pair pseudonym/context to the map only if the key is not in the map
+     * @return true if the pseudonym is available
      */
     public boolean requestPseudonymAndAdd(String pseudo, ChatContext context) {
     	if (clientLoginMap.containsKey(pseudo)) {
@@ -543,8 +677,8 @@ public class ChatOsServer {
     }
     
     /**
-     * Broadcast a private message to the correct recipient if it exist
      * 
+     * @brief Broadcast a private message to the correct recipient if it exist
      * @param message the message to broadcast
      * @param sender SelectionKey of the sender
      * @param recipient String representing the recipient
@@ -561,8 +695,8 @@ public class ChatOsServer {
     	}
     }
     /**
-     * Broadcast a message to every person connected with the exception of the sender
      * 
+     * @brief Broadcast a message to every person connected with the exception of the sender
      * @param message the message to broadcast
      * @param sender SelectionKey of the sender 
      */
@@ -577,6 +711,11 @@ public class ChatOsServer {
     	}
     }
     
+    /**
+     * 
+     * @brief launch the server
+     * @throws IOException when configureBlocking throws it
+     */
     public void launch() throws IOException {
 		serverSocketChannel.configureBlocking(false);
 		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
@@ -590,6 +729,11 @@ public class ChatOsServer {
 		}
     }
     
+    /**
+     * 
+     * @brief treat server key
+     * @param key the server key
+     */
     private void treatKey(SelectionKey key) {
 		printSelectedKey(key); // for debug
 		try {
@@ -619,6 +763,12 @@ public class ChatOsServer {
 		}
 	}
     
+    /**
+     * 
+     * @brief attach a new ChatContext to a key
+     * @param key the server key
+     * @throws IOException when accept throws it
+     */
     private void doAccept(SelectionKey key) throws IOException {
     	ServerSocketChannel ssc = (ServerSocketChannel) key.channel();
 		SocketChannel sc = ssc.accept();
@@ -630,6 +780,11 @@ public class ChatOsServer {
 		newKey.attach(new ChatContext(this,newKey));
     }
     
+    /**
+     * 
+     * @brief silently close the socket channel
+     * @param key the server key
+     */
     private void silentlyClose(SelectionKey key) {
         Channel sc = (Channel) key.channel();
         try {
@@ -640,6 +795,13 @@ public class ChatOsServer {
         }
     }
 	
+    /**
+     * 
+     * @brief main method starting a ChatOs server
+     * @param args usage : port
+     * @throws NumberFormatException when the port arg is not a number
+     * @throws IOException when ServerChatOs throw an IOException
+     */
     public static void main(String[] args) throws NumberFormatException, IOException {
         if (args.length!=1){
             usage();
@@ -648,14 +810,22 @@ public class ChatOsServer {
         new ChatOsServer(Integer.parseInt(args[0])).launch();
     }
 
+    /**
+     * 
+     * @brief print the usage of the server
+     */
     private static void usage(){
         System.out.println("Usage : ChatOsServer port");
     }
     
     
     
-    
-    
+    /**
+	 * 
+	 * @brief get a string format of a key
+	 * @param key the key to parse in a string
+	 * @return the string key
+	 */
 	private String interestOpsToString(SelectionKey key){
 		if (!key.isValid()) {
 			return "CANCELLED";
@@ -668,6 +838,10 @@ public class ChatOsServer {
 		return String.join("|",list);
 	}
 
+	/**
+	 * 
+	 * @brief print the client selectionned keys 
+	 */
 	public void printKeys() {
 		Set<SelectionKey> selectionKeySet = selector.keys();
 		if (selectionKeySet.isEmpty()) {
@@ -687,6 +861,12 @@ public class ChatOsServer {
 		}
 	}
 
+	/**
+	 * 
+	 * @brief get a string format of the remote address of a socket channel
+	 * @param sc the interested socket channel
+	 * @return the string format of the remote address
+	 */
 	private String remoteAddressToString(SocketChannel sc) {
 		try {
 			return sc.getRemoteAddress().toString();
@@ -695,6 +875,11 @@ public class ChatOsServer {
 		}
 	}
 
+	/**
+	 * 
+	 * @brief print a selected key
+	 * @param key the key to print
+	 */
 	public void printSelectedKey(SelectionKey key) {
 		SelectableChannel channel = key.channel();
 		if (channel instanceof ServerSocketChannel) {
@@ -705,6 +890,12 @@ public class ChatOsServer {
 		}
 	}
 
+	/**
+	 * 
+	 * @brief print the possible channel of a key
+	 * @param key the key to examined
+	 * @return a string format of possible actions
+	 */
 	private String possibleActionsToString(SelectionKey key) {
 		if (!key.isValid()) {
 			return "CANCELLED";

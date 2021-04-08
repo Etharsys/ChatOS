@@ -365,7 +365,6 @@ public class ClientChatOs {
 		
 		@Override
 		public void doRead() throws IOException {
-			System.out.println("coucou");
 			if (socket.read(bbin) == -1) {
 				closed = true;
         		return;
@@ -502,7 +501,6 @@ public class ClientChatOs {
 		@Override
 		public void doWrite() throws IOException {
 			processOut();
-			logger.severe("coucou");
 			bbout.flip();
 			if (sc.write(bbout) == -1) {
 				closed = true;

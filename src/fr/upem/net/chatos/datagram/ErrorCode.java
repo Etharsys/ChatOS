@@ -7,17 +7,22 @@ import java.util.logging.Logger;
 import reader.OpCodeReader;
 
 public class ErrorCode implements Datagram {
-	static public final byte OK = 1;
-	static public final byte PSEUDO_UNAVAILABLE = 2;
-	static public final byte INVALID_PSEUDONYM = 3;
-	static public final byte UNREACHABLE_USER = 4;
-	static public final byte TCP_IN_PROTOCOLE = 5;
+	static public final byte OK                   = 1;
+	static public final byte PSEUDO_UNAVAILABLE   = 2;
+	static public final byte INVALID_PSEUDONYM    = 3;
+	static public final byte UNREACHABLE_USER     = 4;
+	static public final byte TCP_IN_PROTOCOLE     = 5;
 	static public final byte TCP_NOT_IN_PROTOCOLE = 6;
-	private final byte errorCode;
+	private       final byte errorCode;
 	
+	/**
+	 * ErrorCode constructor : ErrorCode packet
+	 * @param errorCode
+	 */
 	public ErrorCode(byte errorCode) {
 		this.errorCode = errorCode;
 	}
+	
 	@Override
 	public Optional<ByteBuffer> toByteBuffer(Logger logger) {
 		return Optional.of(ByteBuffer.allocate(2)
@@ -26,6 +31,10 @@ public class ErrorCode implements Datagram {
 				.flip());
 	}
 	
+	/**
+	 * @brief get the request error code
+	 * @return
+	 */
 	public byte getErrorCode() {
 		return errorCode;
 	}

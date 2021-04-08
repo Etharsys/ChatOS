@@ -10,10 +10,15 @@ import reader.OpCodeReader;
 public class ConnectionRequest implements Datagram {
 	private final String pseudo;
 	
+	/**
+	 * ConnectionRequest contructor : TCP private connexion (TCPAsk)
+	 * @param pseudo of the client who ask for a TCP private connexion
+	 */
 	public ConnectionRequest(String pseudo) {
 		Objects.requireNonNull(pseudo);
 		this.pseudo = pseudo;
 	}
+	
 	@Override
 	public Optional<ByteBuffer> toByteBuffer(Logger logger) {
 		var bblog = UTF8_CHARSET.encode(pseudo);

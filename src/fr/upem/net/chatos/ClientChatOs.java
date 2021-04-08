@@ -4,17 +4,22 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
+import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 import fr.upem.net.chatos.datagram.ConnectionRequest;
@@ -22,9 +27,11 @@ import fr.upem.net.chatos.datagram.Datagram;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.MessageAll;
 import fr.upem.net.chatos.datagram.PrivateMessage;
+import fr.upem.net.chatos.datagram.TCPAbort;
 import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
-import fr.upem.net.chatos.datagram.TCPDenied;
+import fr.upem.net.chatos.datagram.TCPConnect;
+import fr.upem.net.chatos.datagram.TCPDatagram;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 
@@ -66,8 +73,6 @@ public class ClientChatOs {
 		 * @brief process the content of bbin
 		 */
 		private void processIn() {
-			//TODO normalement c'est pas different de ClientChat sauf qu'on a un switch sur le type de message reçu !
-			System.out.println(bbin);
 			for (var ps = reader.process(bbin); ps != ProcessStatus.REFILL; ps = reader.process(bbin)) {
 				if (ps == ProcessStatus.ERROR) {
 					silentlyClose();
@@ -165,70 +170,86 @@ public class ClientChatOs {
 
 		@Override
 		public void doConnect() throws IOException {
-			throw new AssertionError();
+			//Impossible
+			key.interestOps(SelectionKey.OP_READ);
 		}
 		
-		public void acceptTCP(TCPAsk tcpAsk){
-			client.acceptTCPConnection(tcpAsk);
+		public void treatTCPAsk(TCPAsk tcpAsk){
+			Objects.requireNonNull(tcpAsk);
+			client.treatTCPAsk(tcpAsk);
+		}
+		
+		public void treatTCPAccept(TCPAccept tcpAccept) {
+			Objects.requireNonNull(tcpAccept);
+			client.treatTCPAccept(tcpAccept);
 		}
 	}
 	
-	public void acceptTCPConnection(TCPAsk tcpAsk){
-		//TODO c'est marche pas
-		if (TCPCommandMap.containsKey(tcpAsk.getSender())) {
-			chatContext.queueCommand(new TCPDenied(tcpAsk.getSender(), tcpAsk.getRecipient(), tcpAsk.getPassword()));
+	private void connectTCP(TCPDatagram request, String recipient, Supplier<TCPDatagram> supplier) {
+		if (TCPCommandMap.containsKey(request.getSender())) {
+			//Already Connected
+			chatContext.queueCommand(new TCPAbort(request.getSender(), request.getRecipient(), request.getPassword()));
 			return;
 		}
 		try {
-			
 			var socket = SocketChannel.open();
 			socket.configureBlocking(false);
-			var key = socket.register(selector, SelectionKey.OP_CONNECT);
-			key.attach(new TCPContextWaiter(key, sc, tcpAsk.getRecipient(), (new TCPAccept(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()).toByteBuffer(logger).get())));
-			TCPCommandMap.put(tcpAsk.getSender(), new ArrayList<>());
+			socket.connect(serverAddress);
+			var newKey = socket.register(selector, SelectionKey.OP_CONNECT);
+			newKey.attach(new TCPContextWaiter(newKey, socket, recipient, supplier.get().toByteBuffer(logger).get()));
 		} catch(IOException e) {
-			chatContext.queueCommand(new TCPDenied(tcpAsk.getSender(), tcpAsk.getRecipient(), tcpAsk.getPassword()));
+			//Aborting connection
+			chatContext.queueCommand(new TCPAbort(request.getSender(), request.getRecipient(), request.getPassword()));
 		}
+	}
+	
+	public void treatTCPAsk(TCPAsk tcpAsk){
+		Objects.requireNonNull(tcpAsk);
+		connectTCP(tcpAsk, tcpAsk.getSender(), () -> new TCPAccept(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()));
+		TCPCommandMap.put(tcpAsk.getSender(), new ArrayList<>());
+	}
+	
+	public void treatTCPAccept(TCPAccept tcpAccept) {
+		Objects.requireNonNull(tcpAccept);
+		connectTCP(tcpAccept, tcpAccept.getRecipient(), () -> new TCPConnect(tcpAccept.getSender(),tcpAccept.getRecipient(),tcpAccept.getPassword()));
 	}
 	
 	public class TCPContextWaiter implements Context{
 		private final String recipient;
 		
-		private final SelectionKey key;
-		private final SocketChannel sc;
+		private final SelectionKey contextKey;
+		private final SocketChannel socket;
 		private final ByteBuffer bbin = ByteBuffer.allocate(2);
 		private final ByteBuffer bbout;
 		
 		private boolean closed;
 		
-		public TCPContextWaiter(SelectionKey key, SocketChannel sc, String recipient, ByteBuffer buffer) {
-			Objects.requireNonNull(key);
-			Objects.requireNonNull(sc);
+		public TCPContextWaiter(SelectionKey contextKey, SocketChannel socket, String recipient, ByteBuffer buffer) {
+			Objects.requireNonNull(contextKey);
+			Objects.requireNonNull(socket);
 			Objects.requireNonNull(recipient);
-			this.key = key;
-			this.sc = sc;
+			this.contextKey = contextKey;
+			this.socket = socket;
 			this.recipient = recipient;
 			bbout = buffer;
 		}
 		
 		private void updateInterestOps() {
-        	int intOps = 0;
-        	if (!closed && bbin.hasRemaining()) {
-        		intOps |= SelectionKey.OP_READ;
-        	}
-        	if (!closed && bbout.position() > 0) {
-        		intOps |= SelectionKey.OP_WRITE;
-        	}
-        	if (intOps == 0) {
+        	if (closed) {
         		silentlyClose();
         		return;
         	}
-        	key.interestOps(intOps);
+        	if (bbout.hasRemaining()) {
+        		contextKey.interestOps(SelectionKey.OP_WRITE);
+        	} else {
+        		contextKey.interestOps(SelectionKey.OP_READ);
+        	}
         }
 		
 		@Override
 		public void doRead() throws IOException {
-			if (sc.read(bbin) == -1) {
+			System.out.println("coucou");
+			if (socket.read(bbin) == -1) {
 				closed = true;
         		return;
         	}
@@ -238,6 +259,7 @@ public class ClientChatOs {
 
 		private void processIn() {
 			if (!bbin.hasRemaining()) {
+				bbin.flip();
 				if (bbin.get() != OpCodeReader.ERROR_PACKET_CODE) {
 					System.out.println("Didn't receive ErrorCode");
 				}
@@ -246,24 +268,17 @@ public class ClientChatOs {
 				if (err.getErrorCode() != ErrorCode.OK) {
 					closed = true;
 				} else {
-					var context = new TCPContext(key,sc,recipient);
-					key.attach(context);
+					var context = new TCPContext(contextKey,socket,recipient);
+					contextKey.attach(context);
 					context.updateInterestOps();
+					System.out.println("Connection TCP with " + recipient + " enabled");
 				}
-			}
-		}
-
-		@Override
-		public void doWrite() throws IOException {
-			if (sc.write(bbout) == -1) {
-				closed = true;
-				return;
 			}
 		}
 		
 		private void silentlyClose() {
             try {
-                sc.close();
+                socket.close();
             } catch (IOException e) {
                 // ignore exception
             }
@@ -271,12 +286,22 @@ public class ClientChatOs {
 
 		@Override
 		public void doConnect() throws IOException {
-			System.out.println(sc.finishConnect());
-        	if (!sc.finishConnect()) {
+        	if (!socket.finishConnect()) {
         		return;
         	}
-        	key.interestOps(SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+        	contextKey.interestOps(SelectionKey.OP_WRITE);
+        	printSelectedKey(contextKey);
         }
+
+		@Override
+		public void doWrite() throws IOException {
+			if (socket.write(bbout) == -1) {
+				closed = true;
+				return;
+			}
+			System.out.println(socket);
+			updateInterestOps();
+		}
 	}
 	
 	/**
@@ -298,6 +323,7 @@ public class ClientChatOs {
 		private boolean closed;
 		
 		public TCPContext(SelectionKey key, SocketChannel sc, String recipient) {
+			logger.severe("Created TCP Context");
 			Objects.requireNonNull(key);
 			Objects.requireNonNull(sc);
 			Objects.requireNonNull(recipient);
@@ -327,13 +353,13 @@ public class ClientChatOs {
 			if (sc.read(bbin) == -1) {
         		closed = true;
         	}
-			
+			throw new AssertionError();
 		}
 
 		@Override
 		public void doWrite() throws IOException {
 			// TODO Auto-generated method stub
-			
+			throw new AssertionError();
 		}
 		
 		private void silentlyClose() {
@@ -363,6 +389,8 @@ public class ClientChatOs {
 	 * Map of command for TCPContext
 	 */
 	private final HashMap<String,ArrayList<String>> TCPCommandMap = new HashMap<>();
+	
+	private final HashSet<String> TCPWaitingConnectionsSet = new HashSet<>();
 	
 	private final SocketChannel     sc;
 	private final Selector          selector;
@@ -437,6 +465,7 @@ public class ClientChatOs {
 					var type = command.split(" ",2);
 					if (type.length != 2) {
 						System.out.println("not enough args");
+						continue;
 					}
 					datagram = new PrivateMessage(login,type[0].substring(1), type[1]);
 				} else {
@@ -444,6 +473,7 @@ public class ClientChatOs {
 					var type = command.split(" ",2);
 					if (type.length != 2) {
 						System.out.println("not enough args");
+						continue;
 					}
 					var recipient = type[0].substring(1);
 					if (TCPCommandMap.containsKey(recipient)) {
@@ -457,6 +487,7 @@ public class ClientChatOs {
 						TCPCommandMap.put(recipient, list);
 						//TODO random short & save it
 						datagram = new TCPAsk(login, recipient,(short) 1);
+						TCPWaitingConnectionsSet.add(recipient);
 					}
 				}
 			}
@@ -535,6 +566,7 @@ public class ClientChatOs {
 		console.start();
 		
 		while (!Thread.interrupted()) {
+			printKeys();
 			try {
 				selector.select(this::treatKey);
 				processCommands();
@@ -549,6 +581,8 @@ public class ClientChatOs {
 	 * @param key the key to check to change the context status
 	 */
 	private void treatKey(SelectionKey key) {
+		printSelectedKey(key);
+		
         try {
             if (key.isValid() && key.isWritable()) {
                 ((Context)key.attachment()).doWrite();
@@ -556,6 +590,14 @@ public class ClientChatOs {
             if (key.isValid() && key.isReadable()) {
             	((Context)key.attachment()).doRead();
             }
+            if (key.isValid() && key.isConnectable()) {
+        		((Context)key.attachment()).doConnect();
+//        		if (selector.keys().size() != 1) {
+//        			printKeys();
+//        			printSelectedKey(key);
+//        			throw new NullPointerException();
+//        		}
+        	}
         } catch(IOException ioe) {
             throw new UncheckedIOException(ioe);
         }
@@ -584,6 +626,65 @@ public class ClientChatOs {
 	
 	private static void usage() {
 		System.out.println("Usage : ClientChatOs login hostname port");
+	}
+	
+	private String interestOpsToString(SelectionKey key){
+		if (!key.isValid()) {
+			return "CANCELLED";
+		}
+		int interestOps = key.interestOps();
+		ArrayList<String> list = new ArrayList<>();
+		if ((interestOps&SelectionKey.OP_ACCEPT)!=0) list.add("OP_ACCEPT");
+		if ((interestOps&SelectionKey.OP_READ)!=0) list.add("OP_READ");
+		if ((interestOps&SelectionKey.OP_WRITE)!=0) list.add("OP_WRITE");
+		return String.join("|",list);
+	}
+
+	public void printKeys() {
+		Set<SelectionKey> selectionKeySet = selector.keys();
+		if (selectionKeySet.isEmpty()) {
+			System.out.println("The selector contains no key : this should not happen!");
+			return;
+		}
+		System.out.println("The selector contains:");
+		for (SelectionKey key : selectionKeySet){
+			SelectableChannel channel = key.channel();
+			if (channel instanceof ServerSocketChannel) {
+				System.out.println("\tKey for ServerSocketChannel : "+ interestOpsToString(key));
+			} else {
+				SocketChannel sc = (SocketChannel) channel;
+				System.out.println("\tKey for Client "+ remoteAddressToString(sc) +" : "+ interestOpsToString(key));
+			}
+		}
+	}
+
+	private String remoteAddressToString(SocketChannel sc) {
+		try {
+			return sc.getRemoteAddress().toString();
+		} catch (IOException e){
+			return "???";
+		}
+	}
+
+	public void printSelectedKey(SelectionKey key) {
+		SelectableChannel channel = key.channel();
+		if (channel instanceof ServerSocketChannel) {
+			System.out.println("\tServerSocketChannel can perform : " + possibleActionsToString(key));
+		} else {
+			SocketChannel sc = (SocketChannel) channel;
+			System.out.println("\tClient " + remoteAddressToString(sc) + " can perform : " + possibleActionsToString(key));
+		}
+	}
+
+	private String possibleActionsToString(SelectionKey key) {
+		if (!key.isValid()) {
+			return "CANCELLED";
+		}
+		ArrayList<String> list = new ArrayList<>();
+		if (key.isAcceptable()) list.add("ACCEPT");
+		if (key.isReadable()) list.add("READ");
+		if (key.isWritable()) list.add("WRITE");
+		return String.join(" and ",list);
 	}
 	
 }

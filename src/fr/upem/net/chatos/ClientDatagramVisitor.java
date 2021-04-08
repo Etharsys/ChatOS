@@ -4,7 +4,7 @@ import fr.upem.net.chatos.ClientChatOs.ChatContext;
 import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
-import fr.upem.net.chatos.datagram.TCPDenied;
+import fr.upem.net.chatos.datagram.TCPAbort;
 import reader.ConnectionRequestReader;
 import reader.DatagramVisitor;
 import reader.ErrorCodeReader;
@@ -49,13 +49,13 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatC
 		System.out.println("Sender : " + tcpAsk.getSender());
 		System.out.println("Recipient : " + tcpAsk.getRecipient());
 		System.out.println("Password : " + tcpAsk.getPassword());
-		context.acceptTCP(tcpAsk);
+		context.treatTCPAsk(tcpAsk);
 	}
 
 	@Override
 	public void visit(TCPDeniedReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
-		TCPDenied tcpDenied = reader.get();
+		TCPAbort tcpDenied = reader.get();
 		System.out.println("Received a TCPDenied with the arguments : ");
 		System.out.println("Sender : " + tcpDenied.getSender());
 		System.out.println("Recipient : " + tcpDenied.getRecipient());
@@ -67,7 +67,7 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatC
 		//On ne devrait jamais arriver ici, on lit le paquet mais on l'ignore
 		//Do nothing
 		TCPConnect tcpConnect = reader.get();
-		System.out.println("Received a TCPDenied with the arguments : ");
+		System.out.println("Received a TCPConnect with the arguments : ");
 		System.out.println("Sender : " + tcpConnect.getSender());
 		System.out.println("Recipient : " + tcpConnect.getRecipient());
 		System.out.println("Password : " + tcpConnect.getPassword());
@@ -76,9 +76,10 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatC
 	@Override
 	public void visit(TCPAcceptReader reader, ChatContext context) {
 		TCPAccept tcpAccept = reader.get();
-		System.out.println("Received a TCPDenied with the arguments : ");
+		System.out.println("Received a TCPAccept with the arguments : ");
 		System.out.println("Sender : " + tcpAccept.getSender());
 		System.out.println("Recipient : " + tcpAccept.getRecipient());
 		System.out.println("Password : " + tcpAccept.getPassword());
+		context.treatTCPAccept(tcpAccept);
 	}
 }

@@ -6,15 +6,15 @@ import java.util.logging.Logger;
 
 import reader.OpCodeReader;
 
-public class TCPDenied extends AbstractTCPDatagram{
+public class TCPAbort extends AbstractTCPDatagram{
 
-	public TCPDenied(String sender, String recipient, short password) {
+	public TCPAbort(String sender, String recipient, short password) {
 		super(sender, recipient, password);
 	}
 
 	@Override
 	public Optional<ByteBuffer> toByteBuffer(Logger logger) {
-		return super.toByteBuffer(logger, OpCodeReader.TCPDENIED_CODE);
+		return super.toByteBuffer(logger, OpCodeReader.TCPABORT_CODE);
 	}
 
 }

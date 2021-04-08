@@ -3,7 +3,7 @@ package server;
 import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
-import fr.upem.net.chatos.datagram.TCPDenied;
+import fr.upem.net.chatos.datagram.TCPAbort;
 import reader.ConnectionRequestReader;
 import reader.DatagramVisitor;
 import reader.ErrorCodeReader;
@@ -79,7 +79,7 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 		if (!context.isConnected()) {
 			context.closeContext();
 		}
-		TCPDenied tcpDenied = reader.get();
+		TCPAbort tcpDenied = reader.get();
 		System.out.println("Received a TCPDenied with the arguments : ");
 		System.out.println("Sender : " + tcpDenied.getSender());
 		System.out.println("Recipient : " + tcpDenied.getRecipient());
@@ -90,19 +90,21 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 	public void visit(TCPConnectReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		TCPConnect tcpConnect = reader.get();
-		System.out.println("Received a TCPDenied with the arguments : ");
+		System.out.println("Received a TCPConnect with the arguments : ");
 		System.out.println("Sender : " + tcpConnect.getSender());
 		System.out.println("Recipient : " + tcpConnect.getRecipient());
 		System.out.println("Password : " + tcpConnect.getPassword());
+		context.broadcast(tcpConnect);
 	}
 
 	@Override
 	public void visit(TCPAcceptReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		TCPAccept tcpAccept = reader.get();
-		System.out.println("Received a TCPDenied with the arguments : ");
+		System.out.println("Received a TCPAccept with the arguments : ");
 		System.out.println("Sender : " + tcpAccept.getSender());
 		System.out.println("Recipient : " + tcpAccept.getRecipient());
 		System.out.println("Password : " + tcpAccept.getPassword());
+		context.broadcast(tcpAccept);
 	}
 }

@@ -29,7 +29,7 @@ import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
 import fr.upem.net.chatos.datagram.TCPDatagram;
-import fr.upem.net.chatos.datagram.TCPDenied;
+import fr.upem.net.chatos.datagram.TCPAbort;
 import reader.OpCodeReader;
 import reader.Reader.ProcessStatus;
 
@@ -90,13 +90,27 @@ public class ChatOsServer {
         public void broadcast(TCPAsk message) {
         	if (!message.getSender().equals(login.get())) {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
-        		queueDatagram(new TCPDenied(message.getSender(), message.getRecipient(), message.getPassword()));
+        		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
         		return;
         	}
         	var code = server.broadcast(message);
         	queueDatagram(new ErrorCode(code));
         	if (code != ErrorCode.OK) {
-        		queueDatagram(new TCPDenied(message.getSender(), message.getRecipient(), message.getPassword()));
+        		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
+        	}
+        }
+        
+        public void broadcast(TCPAccept message) {
+        	var code = server.broadcast(message, this);
+        	if (code != ErrorCode.OK) {
+        		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
+        	}
+        }
+        
+        public void broadcast(TCPConnect message) {
+        	var code = server.broadcast(message, this);
+        	if (code != ErrorCode.OK) {
+        		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
         	}
         }
         
@@ -148,6 +162,7 @@ public class ChatOsServer {
         		return;
         	}
         	System.out.println(queue.size());
+        	System.out.println("Hello");
         	key.interestOps(intOps);
         }
         
@@ -241,35 +256,50 @@ public class ChatOsServer {
 		private Optional<TCPContext> pairedContext = Optional.empty();
 		private final Queue<ByteBuffer> otherQueue = new LinkedList<>();
 		
-		private final SelectionKey key;
-		private final SocketChannel sc;
+		private final SelectionKey tcpContextKey;
+		private final SocketChannel socketChannel;
 		private final ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
 		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
         
 		private boolean closed;
         
-        public TCPContext(SelectionKey key, SocketChannel sc) {
+        public TCPContext(SelectionKey tcpContextKey, SocketChannel socketChannel) {
         	System.out.println("Creating TCPContext");
-			Objects.requireNonNull(key);
-			Objects.requireNonNull(sc);
-			this.key = key;
-			this.sc = sc;
-			key.attach(this);
+			Objects.requireNonNull(tcpContextKey);
+			Objects.requireNonNull(socketChannel);
+			this.tcpContextKey = tcpContextKey;
+			this.socketChannel = socketChannel;
+			tcpContextKey.attach(this);
 		}
         
+        private void updateIntersts() {
+        	updateInterestOps();
+        	pairedContext.get().updateInterestOps();
+        }
+        
         private void updateInterestOps() {
+        	System.out.println("------INTEREST OPS---------");
         	int intOps = 0;
         	if (!closed && bbin.hasRemaining()) {
         		intOps |= SelectionKey.OP_READ;
         	}
-        	if (bbout.position() > 0 || (pairedContext.isPresent() && pairedContext.get().otherQueue.size() != 0)){
+        	System.out.println(bbout);
+        	if (bbout.position() != 0 || (pairedContext.isPresent() && pairedContext.get().otherQueue.size() != 0)){
         		intOps |= SelectionKey.OP_WRITE;
         	}
         	if (intOps == 0) {
         		silentlyClose();
+        		pairedContext.get().silentlyClose();
         		return;
         	}
-        	key.interestOps(intOps);
+        	System.out.println(intOps);
+        	tcpContextKey.interestOps(intOps);
+        	System.out.println(socketChannel);
+        	System.out.println(tcpContextKey);
+        	System.out.println(selector.keys().contains(tcpContextKey));
+        	System.out.println("InterestOps READ | WRITE : " + (SelectionKey.OP_READ | SelectionKey.OP_WRITE));
+        	System.out.println("----------END INTEREST OPS---------");
+        	
         }
         
         public void setPairedContext(TCPContext pairedContext) {
@@ -281,7 +311,7 @@ public class ChatOsServer {
         
         private void silentlyClose() {
             try {
-                sc.close();
+                socketChannel.close();
             } catch (IOException e) {
                 // ignore exception
             }
@@ -289,14 +319,23 @@ public class ChatOsServer {
 
 		@Override
 		public void doRead() throws IOException {
-			// TODO Auto-generated method stub
-			
+			if (socketChannel.read(bbin) == -1) {
+				closed = true;
+				return;
+			}
+			//TODO
+			throw new UnsupportedClassVersionError();
 		}
 
 		@Override
 		public void doWrite() throws IOException {
-			// TODO Auto-generated method stub
-			
+			bbout.flip();
+			if (socketChannel.write(bbout) == -1) {
+				closed = true;
+				return;
+			}
+			bbout.compact();
+			updateIntersts();
 		}
 	}
 	
@@ -326,6 +365,11 @@ public class ChatOsServer {
 			return password == tcpKey.password
 					&& sender.equals(tcpKey.sender)
 					&& recipient.equals(tcpKey.recipient);
+		}
+		
+		@Override
+		public int hashCode() {
+			return sender.hashCode()^recipient.hashCode()+password;
 		}
 	}
 	
@@ -370,8 +414,10 @@ public class ChatOsServer {
 			if (!bothConnected()) {
 				throw new IllegalStateException("Missing connections");
 			}
-			senderContext.get().pairedContext = recipientContext;
-			recipientContext.get().pairedContext = senderContext;
+			senderContext.get().setPairedContext(recipientContext.get());
+			recipientContext.get().setPairedContext(senderContext.get());
+			senderContext.get().updateInterestOps();
+			recipientContext.get().updateInterestOps();
 		}
 	}
 	
@@ -404,7 +450,7 @@ public class ChatOsServer {
      * @return  TCP_IN_PROTOCOLE if the key is not in the map (request not initiated)
      * UNREACHABLE USER if the recipient is not connected and OK otherwise
      */
-    public byte broadcast(TCPDenied message) {
+    public byte broadcast(TCPAbort message) {
     	Objects.requireNonNull(message);
     	if (!clientLoginMap.containsKey(message.getSender())) {
     		return ErrorCode.UNREACHABLE_USER;
@@ -439,9 +485,8 @@ public class ChatOsServer {
     public byte broadcast(TCPAccept message, ChatContext context) {
     	Objects.requireNonNull(message);
     	Objects.requireNonNull(context);
-    	//TODO send error
+    	clientLoginMap.get(message.getSender()).queueDatagram(message);
     	return acceptConnection(message, context, (key) -> {
-    		clientLoginMap.get(message.getSender()).queueDatagram(message);
         	var link = waitingTCPConnections.get(key);
         	link.connectRecipientContext(context.key, context.sc);
         	if (link.bothConnected()) {
@@ -449,28 +494,12 @@ public class ChatOsServer {
         		waitingTCPConnections.remove(key);
         	}
     	});
-    	/*
-    	if (!clientLoginMap.containsKey(message.getSender())) {
-    		return ErrorCode.UNREACHABLE_USER;
-    	}
-    	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
-    	if (!waitingTCPConnections.containsKey(key)) {
-    		return ErrorCode.TCP_NOT_IN_PROTOCOLE;
-    	}
-    	clientLoginMap.get(message.getSender()).queueDatagram(message);
-    	var link = waitingTCPConnections.get(key);
-    	link.connectRecipientContext(context.key, context.sc);
-    	if (link.bothConnected()) {
-    		link.connect();
-    		waitingTCPConnections.remove(key);
-    	}
-    	return ErrorCode.OK;
-    	*/
     }
     
     public byte broadcast(TCPConnect message, ChatContext context) {
     	Objects.requireNonNull(message);
     	Objects.requireNonNull(context);
+    	System.out.println("starting TCPConnect");
     	return acceptConnection(message, context, (key) -> {
         	var link = waitingTCPConnections.get(key);
         	link.connectSenderContext(context.key, context.sc);
@@ -550,13 +579,11 @@ public class ChatOsServer {
 		serverSocketChannel.register(selector, SelectionKey.OP_ACCEPT);
 		while(!Thread.interrupted()) {
 			printKeys(); // for debug
-			System.out.println("Starting select");
 			try {
 				selector.select(this::treatKey);
 			} catch (UncheckedIOException tunneled) {
 				throw tunneled.getCause();
 			}
-			System.out.println("Select finished");
 		}
     }
     
@@ -580,9 +607,11 @@ public class ChatOsServer {
 		} catch (IOException e) {
 			logger.log(Level.INFO,"Connection closed with client due to IOException",e);
 			silentlyClose(key);
-			var login = ((ChatContext)key.attachment()).login;
-			if (login.isPresent()) {
-				clientLoginMap.remove(login.get());
+			if (key.attachment() instanceof ChatContext) {
+				var login = ((ChatContext)key.attachment()).login;
+				if (login.isPresent()) {
+					clientLoginMap.remove(login.get());
+				}
 			}
 		}
 	}
@@ -594,7 +623,7 @@ public class ChatOsServer {
 			return;
 		}
 		sc.configureBlocking(false);
-		var newKey = sc.register(selector, SelectionKey.OP_READ,ByteBuffer.allocate(BUFFER_SIZE));
+		var newKey = sc.register(selector, SelectionKey.OP_READ);
 		newKey.attach(new ChatContext(this,newKey));
     }
     
@@ -642,6 +671,7 @@ public class ChatOsServer {
 			System.out.println("The selector contains no key : this should not happen!");
 			return;
 		}
+		System.out.println(selectionKeySet);
 		System.out.println("The selector contains:");
 		for (SelectionKey key : selectionKeySet){
 			SelectableChannel channel = key.channel();

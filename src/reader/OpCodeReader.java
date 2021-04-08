@@ -12,7 +12,7 @@ public class OpCodeReader{
 	static public final byte SMA_CODE = 3;
 	static public final byte TCPASK_CODE = 4;
 	static public final byte TCPACCEPT_CODE = 5;
-	static public final byte TCPDENIED_CODE = 6;
+	static public final byte TCPABORT_CODE = 6;
 	static public final byte TCPCONNECT_CODE = 7;
 	static public final byte ERROR_PACKET_CODE = 8;
 	
@@ -52,7 +52,7 @@ public class OpCodeReader{
 		case TCPACCEPT_CODE:
 			reader = Optional.of(TCPAccept);
 			break;
-		case TCPDENIED_CODE:
+		case TCPABORT_CODE:
 			reader = Optional.of(TCPDenied);
 			break;
 		case TCPCONNECT_CODE:

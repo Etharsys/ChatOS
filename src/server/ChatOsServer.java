@@ -161,8 +161,6 @@ public class ChatOsServer {
         		silentlyClose();
         		return;
         	}
-        	System.out.println(queue.size());
-        	System.out.println("Hello");
         	key.interestOps(intOps);
         }
         
@@ -254,17 +252,14 @@ public class ChatOsServer {
 	private class TCPContext implements Context{
 		
 		private Optional<TCPContext> pairedContext = Optional.empty();
-		private final Queue<ByteBuffer> otherQueue = new LinkedList<>();
 		
 		private final SelectionKey tcpContextKey;
 		private final SocketChannel socketChannel;
-		private final ByteBuffer bbin = ByteBuffer.allocate(BUFFER_SIZE);
 		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
         
 		private boolean closed;
         
         public TCPContext(SelectionKey tcpContextKey, SocketChannel socketChannel) {
-        	System.out.println("Creating TCPContext");
 			Objects.requireNonNull(tcpContextKey);
 			Objects.requireNonNull(socketChannel);
 			this.tcpContextKey = tcpContextKey;
@@ -272,34 +267,25 @@ public class ChatOsServer {
 			tcpContextKey.attach(this);
 		}
         
-        private void updateIntersts() {
+        private void updateInterests() {
         	updateInterestOps();
         	pairedContext.get().updateInterestOps();
         }
         
+        //TODO deconnecter l'autre en cas de déconnection de l'un
         private void updateInterestOps() {
-        	System.out.println("------INTEREST OPS---------");
         	int intOps = 0;
-        	if (!closed && bbin.hasRemaining()) {
+        	if (!closed && pairedContext.get().bbout.hasRemaining()) {
         		intOps |= SelectionKey.OP_READ;
         	}
-        	System.out.println(bbout);
-        	if (bbout.position() != 0 || (pairedContext.isPresent() && pairedContext.get().otherQueue.size() != 0)){
+        	if (bbout.position() != 0){
         		intOps |= SelectionKey.OP_WRITE;
         	}
         	if (intOps == 0) {
         		silentlyClose();
-        		pairedContext.get().silentlyClose();
         		return;
         	}
-        	System.out.println(intOps);
         	tcpContextKey.interestOps(intOps);
-        	System.out.println(socketChannel);
-        	System.out.println(tcpContextKey);
-        	System.out.println(selector.keys().contains(tcpContextKey));
-        	System.out.println("InterestOps READ | WRITE : " + (SelectionKey.OP_READ | SelectionKey.OP_WRITE));
-        	System.out.println("----------END INTEREST OPS---------");
-        	
         }
         
         public void setPairedContext(TCPContext pairedContext) {
@@ -319,12 +305,11 @@ public class ChatOsServer {
 
 		@Override
 		public void doRead() throws IOException {
-			if (socketChannel.read(bbin) == -1) {
+			if (socketChannel.read(pairedContext.get().bbout) == -1) {
 				closed = true;
 				return;
 			}
-			//TODO
-			throw new UnsupportedClassVersionError();
+			updateInterests();
 		}
 
 		@Override
@@ -335,7 +320,7 @@ public class ChatOsServer {
 				return;
 			}
 			bbout.compact();
-			updateIntersts();
+			updateInterests();
 		}
 	}
 	
@@ -567,7 +552,7 @@ public class ChatOsServer {
     	Objects.requireNonNull(message);
     	Objects.requireNonNull(sender);
     	for (SelectionKey key : selector.keys()) {
-    		if (key.isValid() && !key.isAcceptable() && !key.equals(sender.key)) {
+    		if (key.isValid() && !key.isAcceptable() && !key.equals(sender.key) && key.attachment() instanceof ChatContext) {
     			var context = (ChatContext) key.attachment();
     			context.queueDatagram(message);
     		}

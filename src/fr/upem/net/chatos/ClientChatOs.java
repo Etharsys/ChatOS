@@ -9,6 +9,8 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -206,7 +208,7 @@ public class ClientChatOs {
 	public void treatTCPAsk(TCPAsk tcpAsk){
 		Objects.requireNonNull(tcpAsk);
 		connectTCP(tcpAsk, tcpAsk.getSender(), () -> new TCPAccept(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()));
-		TCPCommandMap.put(tcpAsk.getSender(), new ArrayList<>());
+		TCPCommandMap.put(tcpAsk.getSender(), new LinkedList<>());
 	}
 	
 	public void treatTCPAccept(TCPAccept tcpAccept) {
@@ -253,8 +255,8 @@ public class ClientChatOs {
 				closed = true;
         		return;
         	}
-			processIn();
 			updateInterestOps();
+			processIn();
 		}
 
 		private void processIn() {
@@ -271,6 +273,7 @@ public class ClientChatOs {
 					var context = new TCPContext(contextKey,socket,recipient);
 					contextKey.attach(context);
 					context.updateInterestOps();
+					TCPContextMap.put(recipient, context);
 					System.out.println("Connection TCP with " + recipient + " enabled");
 				}
 			}
@@ -299,7 +302,6 @@ public class ClientChatOs {
 				closed = true;
 				return;
 			}
-			System.out.println(socket);
 			updateInterestOps();
 		}
 	}
@@ -344,8 +346,17 @@ public class ClientChatOs {
         		silentlyClose();
         		return;
         	}
+        	System.out.println(intOps);
         	key.interestOps(intOps);
         }
+		
+		private final Charset ASCII = StandardCharsets.US_ASCII;
+		
+		private void processIn() {
+			bbin.flip();
+			System.out.println("From the TCP connection : " + ASCII.decode(bbin));
+			bbin.clear();
+		}
 
 		@Override
 		public void doRead() throws IOException {
@@ -353,13 +364,35 @@ public class ClientChatOs {
 			if (sc.read(bbin) == -1) {
         		closed = true;
         	}
-			throw new AssertionError();
+			processIn();
+			updateInterestOps();
+		}
+
+		private void processOut() {
+			while (TCPCommandMap.get(recipient).size() != 0) {
+				var command = TCPCommandMap.get(recipient).peek();
+				var bb = ASCII.encode(command);
+				if (bbout.limit() >= bb.limit()) {
+					bbout.put(bb);
+					TCPCommandMap.get(recipient).poll();
+				} else {
+					break;
+				}
+			}
 		}
 
 		@Override
 		public void doWrite() throws IOException {
 			// TODO Auto-generated method stub
-			throw new AssertionError();
+			processOut();
+			logger.severe("coucou");
+			bbout.flip();
+			if (sc.write(bbout) == -1) {
+				closed = true;
+				return;
+			}
+			bbout.compact();
+			updateInterestOps();
 		}
 		
 		private void silentlyClose() {
@@ -388,9 +421,12 @@ public class ClientChatOs {
 	/**
 	 * Map of command for TCPContext
 	 */
-	private final HashMap<String,ArrayList<String>> TCPCommandMap = new HashMap<>();
+	private final HashMap<String,Queue<String>> TCPCommandMap = new HashMap<>();
+	private final HashMap<String, TCPContext> TCPContextMap = new HashMap<>();
 	
 	private final HashSet<String> TCPWaitingConnectionsSet = new HashSet<>();
+	
+	
 	
 	private final SocketChannel     sc;
 	private final Selector          selector;
@@ -479,10 +515,13 @@ public class ClientChatOs {
 					if (TCPCommandMap.containsKey(recipient)) {
 						//Le TCPContext existe déja ou est en cours de création.
 						TCPCommandMap.get(recipient).add(type[1]);
+						if (TCPContextMap.containsKey(recipient)) {
+							TCPContextMap.get(recipient).updateInterestOps();
+						}
 						return;
 					} else {
 						//Le TCPContext n'a pas encore été demandé pour ce destinataire -> on le crée
-						var list = new ArrayList<String>();
+						var list = new LinkedList<String>();
 						list.add(type[1]);
 						TCPCommandMap.put(recipient, list);
 						//TODO random short & save it

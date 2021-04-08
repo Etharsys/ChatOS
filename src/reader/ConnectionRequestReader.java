@@ -4,6 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.Objects;
 
 public class ConnectionRequestReader implements DatagramReader<String>{
+	
 	private final StringReader reader = new StringReader();
 
 	@Override

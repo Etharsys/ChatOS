@@ -6,10 +6,17 @@ import java.util.Objects;
 import fr.upem.net.chatos.datagram.PrivateMessage;
 
 public class SendPrivateMessageReader implements DatagramReader<PrivateMessage>{
-	private enum State {DONE,WAITING_SENDER_LOGIN, WAITING_LOGINR, WAITING_MESSAGE,ERROR};
+	private enum State {
+		DONE,
+		WAITING_SENDER_LOGIN, 
+		WAITING_LOGINR, 
+		WAITING_MESSAGE,
+		ERROR
+	};
 	
-    private State state = State.WAITING_SENDER_LOGIN;
+    private State              state        = State.WAITING_SENDER_LOGIN;
     private final StringReader stringReader = new StringReader();
+    
     private String sender;
     private String recipient;
     private String message;

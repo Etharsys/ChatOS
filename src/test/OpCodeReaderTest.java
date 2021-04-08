@@ -18,7 +18,7 @@ import reader.SendPrivateMessageReader;
 import reader.TCPAcceptReader;
 import reader.TCPAskReader;
 import reader.TCPConnectReader;
-import reader.TCPDeniedReader;
+import reader.TCPAbortReader;
 import reader.Reader.ProcessStatus;
 
 class OpCodeReaderTest {
@@ -53,7 +53,7 @@ class OpCodeReaderTest {
 			}
 
 			@Override
-			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			public void visit(TCPAbortReader tcpDeniedReader, Void context) {
 			}
 
 			@Override
@@ -100,7 +100,7 @@ class OpCodeReaderTest {
 			}
 
 			@Override
-			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			public void visit(TCPAbortReader tcpDeniedReader, Void context) {
 			}
 
 			@Override
@@ -151,7 +151,7 @@ class OpCodeReaderTest {
 			}
 
 			@Override
-			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			public void visit(TCPAbortReader tcpDeniedReader, Void context) {
 			}
 
 			@Override
@@ -200,7 +200,7 @@ class OpCodeReaderTest {
 			}
 
 			@Override
-			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			public void visit(TCPAbortReader tcpDeniedReader, Void context) {
 			}
 
 			@Override
@@ -255,7 +255,7 @@ class OpCodeReaderTest {
 			}
 
 			@Override
-			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			public void visit(TCPAbortReader tcpDeniedReader, Void context) {
 			}
 
 			@Override
@@ -299,7 +299,7 @@ class OpCodeReaderTest {
 			}
 
 			@Override
-			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			public void visit(TCPAbortReader tcpDeniedReader, Void context) {
 			}
 
 			@Override

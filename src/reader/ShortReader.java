@@ -3,10 +3,15 @@ import java.nio.ByteBuffer;
 
 public class ShortReader implements Reader<Short> {
 
-    private enum State {DONE,WAITING,ERROR};
+    private enum State {
+    	DONE,
+    	WAITING,
+    	ERROR
+    };
 
-    private State state = State.WAITING;
+    private State            state      = State.WAITING;
     private final ByteBuffer internalbb = ByteBuffer.allocate(Short.BYTES); // write-mode
+   
     private short value;
 
     @Override

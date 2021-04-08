@@ -5,9 +5,17 @@ import java.util.Objects;
 
 import fr.upem.net.chatos.datagram.ErrorCode;
 
-//TODO le cas TCP connect
 public class ErrorCodeReader implements DatagramReader<ErrorCode>{
-	private enum State {DONE,WAITING,ERROR};
+	
+	/**
+	 * the status of the reader for a ErrorCode request
+	 */
+	private enum State {
+		DONE,
+		WAITING,
+		ERROR
+	};
+	
 	private State state = State.WAITING;
 	private byte code;
 	

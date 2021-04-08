@@ -13,7 +13,7 @@ import reader.SendPrivateMessageReader;
 import reader.TCPAcceptReader;
 import reader.TCPAskReader;
 import reader.TCPConnectReader;
-import reader.TCPDeniedReader;
+import reader.TCPAbortReader;
 
 public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatContext>{
 
@@ -53,7 +53,7 @@ public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatC
 	}
 
 	@Override
-	public void visit(TCPDeniedReader reader, ChatContext context) {
+	public void visit(TCPAbortReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		TCPAbort tcpDenied = reader.get();
 		System.out.println("Received a TCPDenied with the arguments : ");

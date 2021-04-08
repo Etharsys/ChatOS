@@ -12,7 +12,7 @@ import reader.SendPrivateMessageReader;
 import reader.TCPAcceptReader;
 import reader.TCPAskReader;
 import reader.TCPConnectReader;
-import reader.TCPDeniedReader;
+import reader.TCPAbortReader;
 import server.ChatOsServer.ChatContext;
 
 public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
@@ -74,7 +74,7 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 	}
 	
 	@Override
-	public void visit(TCPDeniedReader reader, ChatContext context) {
+	public void visit(TCPAbortReader reader, ChatContext context) {
 		// TODO Auto-generated method stub
 		if (!context.isConnected()) {
 			context.closeContext();

@@ -7,10 +7,16 @@ import fr.upem.net.chatos.datagram.MessageAll;
 
 
 public class SendMessageAllReader implements DatagramReader<MessageAll> {
-	private enum State {DONE,WAITING_LOGIN, WAITING_MESSAGE,ERROR};
+	private enum State {
+		DONE,
+		WAITING_LOGIN, 
+		WAITING_MESSAGE,
+		ERROR
+	};
 	
-    private State state = State.WAITING_LOGIN;
+    private State              state        = State.WAITING_LOGIN;
     private final StringReader stringReader = new StringReader();
+    
     private String login;
     private String message;
 

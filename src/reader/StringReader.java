@@ -5,13 +5,20 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
 public class StringReader implements Reader<String> {
-	private static final int STRING_SIZE = 1024;
-	private static final Charset UTF_8 = StandardCharsets.UTF_8;
-	private enum State {DONE,WAITING_INT, WAITING_STRING,ERROR};
+	private static final int     STRING_SIZE = 1024;
+	private static final Charset UTF_8       = StandardCharsets.UTF_8;
 	
-    private State state = State.WAITING_INT;
+	private enum State {
+		DONE,
+		WAITING_INT, 
+		WAITING_STRING,
+		ERROR
+	};
+	
+    private State             state       = State.WAITING_INT;
     private final ShortReader shortReader = new ShortReader();
-    private final ByteBuffer internalbb = ByteBuffer.allocate(STRING_SIZE); // write-mode
+    private final ByteBuffer  internalbb  = ByteBuffer.allocate(STRING_SIZE); // write-mode
+    
     private String value;
 
     

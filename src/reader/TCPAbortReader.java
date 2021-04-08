@@ -2,7 +2,7 @@ package reader;
 
 import fr.upem.net.chatos.datagram.TCPAbort;
 
-public class TCPDeniedReader extends AbstractTCPDatagramReader<TCPAbort> {
+public class TCPAbortReader extends AbstractTCPDatagramReader<TCPAbort> {
 	@Override
 	public <T> void accept(DatagramVisitor<T> visitor, T context) {
 		visitor.visit(this, context);

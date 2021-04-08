@@ -7,30 +7,44 @@ import java.util.Optional;
 import reader.Reader.ProcessStatus;
 
 public class OpCodeReader{
-	static public final byte CR_CODE = 1;
-	static public final byte SPM_CODE = 2;
-	static public final byte SMA_CODE = 3;
-	static public final byte TCPASK_CODE = 4;
-	static public final byte TCPACCEPT_CODE = 5;
-	static public final byte TCPABORT_CODE = 6;
-	static public final byte TCPCONNECT_CODE = 7;
+	static public final byte CR_CODE           = 1;
+	static public final byte SPM_CODE          = 2;
+	static public final byte SMA_CODE          = 3;
+	static public final byte TCPASK_CODE       = 4;
+	static public final byte TCPACCEPT_CODE    = 5;
+	static public final byte TCPABORT_CODE     = 6;
+	static public final byte TCPCONNECT_CODE   = 7;
 	static public final byte ERROR_PACKET_CODE = 8;
 	
-	private enum State {DONE,WAITING,ERROR};
+	/**
+	 * the status of the reader for an initial packet
+	 */
+	private enum State {
+		DONE,
+		WAITING,
+		ERROR
+	};
+	
 	private State state = State.WAITING;
 	
 	//Readers
-	private final ConnectionRequestReader CR = new ConnectionRequestReader();
-	private final SendPrivateMessageReader SPM = new SendPrivateMessageReader();
-	private final SendMessageAllReader SMA = new SendMessageAllReader();
-	private final ErrorCodeReader ERROR = new ErrorCodeReader();
-	private final TCPAskReader TCPAsk = new TCPAskReader();
-	private final TCPAcceptReader TCPAccept = new TCPAcceptReader();
-	private final TCPDeniedReader TCPDenied = new TCPDeniedReader();
-	private final TCPConnectReader TCPConnect = new TCPConnectReader();
+	private final ConnectionRequestReader  CR         = new ConnectionRequestReader();
+	private final SendPrivateMessageReader SPM        = new SendPrivateMessageReader();
+	private final SendMessageAllReader     SMA        = new SendMessageAllReader();
+	private final ErrorCodeReader          ERROR      = new ErrorCodeReader();
+	private final TCPAskReader             TCPAsk     = new TCPAskReader();
+	private final TCPAcceptReader          TCPAccept  = new TCPAcceptReader();
+	private final TCPAbortReader           TCPDenied  = new TCPAbortReader();
+	private final TCPConnectReader         TCPConnect = new TCPConnectReader();
 	
 	private Optional<DatagramReader<?>> reader = Optional.empty();
 	
+	/**
+	 * 
+	 * @brief initiate the reader in terms of the first byte of the bytebuffer
+	 * @param bb the bytebuffer to parse
+	 * @return the status of the current reader
+	 */
 	private ProcessStatus getReader(ByteBuffer bb) {
 		if (bb.position() == 0) {
 			return ProcessStatus.REFILL;
@@ -68,6 +82,12 @@ public class OpCodeReader{
 		return ProcessStatus.DONE;
 	}
 	
+	/**
+	 * 
+	 * @brief process the bytebuffer 
+	 * @param bb the bytebuffer to parse
+	 * @return the actual status of the reader
+	 */
 	public ProcessStatus process(ByteBuffer bb) {
 		Objects.requireNonNull(bb);
 		if (state== State.DONE || state== State.ERROR) {
@@ -101,6 +121,13 @@ public class OpCodeReader{
 		return ProcessStatus.REFILL;
 	}
 	
+	/**
+	 * 
+	 * @brief accept the visitor method
+	 * @param <T> the parametized type
+	 * @param visitor the datagram visitor (parametized with T)
+	 * @param context the actual context
+	 */
 	public <T> void accept(DatagramVisitor<T> visitor, T context) {
 		Objects.requireNonNull(visitor);
 		if (state != State.DONE) {
@@ -109,6 +136,10 @@ public class OpCodeReader{
 		reader.get().accept(visitor, context);
 	}
 
+	/**
+	 * 
+	 * @brief reset the reader
+	 */
 	public void reset() {
 		state = State.WAITING;
 		if (reader.isPresent()) {

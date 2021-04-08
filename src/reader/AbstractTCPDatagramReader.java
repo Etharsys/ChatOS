@@ -6,23 +6,48 @@ import java.util.Objects;
 import fr.upem.net.chatos.datagram.TCPDatagram;
 
 abstract class AbstractTCPDatagramReader<T extends TCPDatagram> implements DatagramReader<T> {
-	private enum State {DONE, WAITING_SENDER, WAITING_RECIPIENT, WAITING_PASSWORD, ERROR};
 	
-    private State state = State.WAITING_SENDER;
+	/**
+	 * the status of the reader for a TCP private connexion request
+	 */
+	private enum State {
+		DONE, 
+		WAITING_SENDER, 
+		WAITING_RECIPIENT, 
+		WAITING_PASSWORD, 
+		ERROR
+	};
+	
+    private       State        state        = State.WAITING_SENDER;
     private final StringReader stringReader = new StringReader();
-    private final ShortReader shortReader = new ShortReader();
-    private String sender;
-    private String recipient;
-    private short password;
+    private final ShortReader  shortReader  = new ShortReader();
+    private       String       sender;
+    private       String       recipient;
+    private       short        password;
     
+    /**
+     * 
+     * @brief get the TCP private connexion password
+     * @return
+     */
     short getPassword() {
 		return password;
 	}
     
+    /**
+     * 
+     * @brief get the sender pseudonym
+     * @return the pseudonym
+     */
     String getSender() {
 		return sender;
 	}
     
+    /**
+     * 
+     * @brief get the recipient pseudonym
+     * @return the pseudonym
+     */
     String getRecipient() {
 		return recipient;
 	}

@@ -20,7 +20,7 @@ import reader.SendPrivateMessageReader;
 import reader.TCPAcceptReader;
 import reader.TCPAskReader;
 import reader.TCPConnectReader;
-import reader.TCPDeniedReader;
+import reader.TCPAbortReader;
 
 public class SendPrivateMessageReaderTest {
 	private static final Charset UTF_8 = StandardCharsets.UTF_8;
@@ -98,7 +98,7 @@ public class SendPrivateMessageReaderTest {
 			}
 
 			@Override
-			public void visit(TCPDeniedReader tcpDeniedReader, Void context) {
+			public void visit(TCPAbortReader tcpDeniedReader, Void context) {
 			}
 
 			@Override

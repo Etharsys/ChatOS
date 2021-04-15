@@ -29,8 +29,17 @@ import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
 import fr.upem.net.chatos.datagram.TCPDatagram;
+import fr.upem.net.chatos.reader.ConnectionRequestReader;
+import fr.upem.net.chatos.reader.DatagramVisitor;
+import fr.upem.net.chatos.reader.ErrorCodeReader;
 import fr.upem.net.chatos.reader.OpCodeReader;
 import fr.upem.net.chatos.reader.Reader.ProcessStatus;
+import fr.upem.net.chatos.reader.SendMessageAllReader;
+import fr.upem.net.chatos.reader.SendPrivateMessageReader;
+import fr.upem.net.chatos.reader.TCPAbortReader;
+import fr.upem.net.chatos.reader.TCPAcceptReader;
+import fr.upem.net.chatos.reader.TCPAskReader;
+import fr.upem.net.chatos.reader.TCPConnectReader;
 import fr.upem.net.chatos.datagram.TCPAbort;
 
 
@@ -49,6 +58,225 @@ public class ChatOsServer {
 		 * @throws IOException when write throws it
 		 */
 		void doWrite() throws IOException;
+	}
+	
+	private class WaitingContext implements Context {
+		final private SelectionKey    key;
+        final private SocketChannel   sc;
+        final private ByteBuffer      bbin  = ByteBuffer.allocate(BUFFER_SIZE);
+        final private ByteBuffer      bbout = ByteBuffer.allocate(BUFFER_SIZE);
+        final private Queue<Datagram> queue = new LinkedList<>();
+        final private ChatOsServer    server;
+        
+        private boolean closed;
+        
+        //TODO pas ouf comme méthode
+        private boolean done;
+        
+        private WaitingContext(ChatOsServer server, SelectionKey key){
+            this.key = key;
+            this.sc = (SocketChannel) key.channel();
+            this.server = server;
+        }
+        
+        final private OpCodeReader          reader  = new OpCodeReader();
+        final private DatagramVisitor<WaitingContext> visitor = new DatagramVisitor<WaitingContext>() {
+			@Override
+			public void visit(ConnectionRequestReader reader, WaitingContext context) {
+				// TODO Auto-generated method stub
+				Objects.requireNonNull(reader);
+				Objects.requireNonNull(context);
+				requestPseudonym(reader.get());
+			}
+			
+			@Override
+			public void visit(SendPrivateMessageReader reader, WaitingContext context) {
+				Objects.requireNonNull(reader);
+				Objects.requireNonNull(context);
+				queueError(ErrorCode.NOT_CONNECTED);
+			}
+
+			@Override
+			public void visit(SendMessageAllReader reader, WaitingContext context) {
+				Objects.requireNonNull(reader);
+				Objects.requireNonNull(context);
+				queueError(ErrorCode.NOT_CONNECTED);
+			}
+
+			@Override
+			public void visit(ErrorCodeReader reader, WaitingContext context) {
+				Objects.requireNonNull(reader);
+				Objects.requireNonNull(context);
+				queueError(ErrorCode.NOT_CONNECTED);
+			}
+
+			@Override
+			public void visit(TCPAskReader reader, WaitingContext context) {
+				Objects.requireNonNull(reader);
+				Objects.requireNonNull(context);
+				queueError(ErrorCode.NOT_CONNECTED);
+			}
+
+			@Override
+			public void visit(TCPAbortReader reader, WaitingContext context) {
+				Objects.requireNonNull(reader);
+				Objects.requireNonNull(context);
+				queueError(ErrorCode.NOT_CONNECTED);
+			}
+
+			@Override
+			public void visit(TCPConnectReader reader, WaitingContext context) {
+				Objects.requireNonNull(reader);
+				Objects.requireNonNull(context);
+				// TODO Auto-generated method stub
+				computeTCPConnect(reader.get());
+			}
+
+			@Override
+			public void visit(TCPAcceptReader reader, WaitingContext context) {
+				Objects.requireNonNull(reader);
+				Objects.requireNonNull(context);
+				// TODO Auto-generated method stub
+				computeTCPAccept(reader.get());
+			}
+        	
+        };
+        
+        private void computeTCPDatagramAnswer(byte error) {
+        	if (error == ErrorCode.OK) {
+        		done = true;
+        	} else {
+        		queueError(error);
+        	}
+        }
+        
+        private void computeTCPAccept(TCPAccept message) {
+        	computeTCPDatagramAnswer(tryTCPAccept(message, this));
+        }
+        
+        private void computeTCPConnect(TCPConnect message) {
+        	computeTCPDatagramAnswer(tryTCPConnect(message, this));
+        }
+        
+        private void queueError(byte error) {
+        	queue.add(new ErrorCode(error));
+        }
+        
+        private void requestPseudonym(String pseudo) {
+        	if (server.isAvailable(pseudo)) {
+        		var context = new ChatContext(server, key);
+        		context.queueDatagram(new ErrorCode(ErrorCode.OK));
+        		server.addChatContext(pseudo, context);
+        		done = true;
+        	} else {
+        		queueError(ErrorCode.PSEUDO_UNAVAILABLE);
+        	}
+        }
+        
+        private void updateInterestOps() {
+        	if (done) {
+        		return;
+        	}
+        	int intOps = 0;
+        	if (!closed && bbin.hasRemaining()) {
+        		intOps |= SelectionKey.OP_READ;
+        	}
+        	if (bbout.position() > 0 || queue.size() != 0) {
+        		intOps |= SelectionKey.OP_WRITE;
+        	}
+        	if (intOps == 0) {
+        		silentlyClose();
+        		return;
+        	}
+        	key.interestOps(intOps);
+        }
+        
+        /**
+         * @brief Performs the read action on sc
+         *
+         * The convention is that both buffers are in write-mode before the call
+         * to doRead and after the call
+         *
+         * @throws IOException
+         */
+        @Override
+        public void doRead() throws IOException {
+        	if (sc.read(bbin) == -1) {
+        		closed = true;
+        	}
+    		processIn();
+        	updateInterestOps();
+        }
+        
+        /**
+         * @brief Process the content of bbin
+         *
+         * The convention is that bbin is in write-mode before the call
+         * to process and after the call
+         *
+         */
+        private void processIn() {
+        	var ps = reader.process(bbin);
+			if (ps != ProcessStatus.REFILL) {
+				if (ps == ProcessStatus.ERROR) {
+					silentlyClose();
+					return;
+				} else {
+					reader.accept(visitor, this);
+					reader.reset();
+				}
+			}
+        }
+        
+        /**
+         * @brief Try to fill bbout from the queue
+         *
+         */
+        private void processOut() {
+    		while (!queue.isEmpty()) {
+				var datagram = queue.peek();
+				var optBB = datagram.toByteBuffer(logger);
+				if (optBB.isEmpty()) {
+					queue.remove();
+				}
+				var bb = optBB.get();
+				if (bb.remaining() <= bbout.remaining()) {
+					queue.remove();
+					bbout.put(bb);
+				} else {
+					break;
+				}
+			}
+        }
+
+		/**	
+         * @brief Performs the write action on sc
+         *
+         * The convention is that both buffers are in write-mode before the call
+         * to doWrite and after the call
+         *
+         * @throws IOException
+         */
+        @Override
+        public void doWrite() throws IOException {
+        	processOut();
+        	bbout.flip();
+        	sc.write(bbout);
+        	bbout.compact();
+        	updateInterestOps();
+        }
+		
+		/**
+         * 
+		 * @brief silently close the socket channel
+		 */
+        private void silentlyClose() {
+            try {
+                sc.close();
+            } catch (IOException e) {
+                // ignore exception
+            }
+        }
 	}
 	
 	public class ChatContext implements Context {
@@ -201,6 +429,7 @@ public class ChatOsServer {
         		queueDatagram(new ErrorCode(ErrorCode.PSEUDO_UNAVAILABLE));
         		closed = true;
         	}
+        	//TODO
         }
         
         /**
@@ -310,7 +539,6 @@ public class ChatOsServer {
 	}
 	
 	/*--------------------TCP RELATED PART-------------------------*/
-	//TODO
 	private class TCPContext implements Context {
 		
 		private Optional<TCPContext> pairedContext = Optional.empty();
@@ -533,7 +761,6 @@ public class ChatOsServer {
      * UNREACHABLE USER if the recipient is not connected, OK otherwise
      */
     public byte broadcast(TCPAsk message) {
-    	
     	Objects.requireNonNull(message);
     	if (!clientLoginMap.containsKey(message.getRecipient())) {
     		System.out.println("UNREACHABLE");
@@ -542,7 +769,7 @@ public class ChatOsServer {
     	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
 		if (waitingTCPConnections.containsKey(key)) {
 			System.out.println("IN_PROTOCOLE");
-			return ErrorCode.TCP_IN_PROTOCOLE;//TODO
+			return ErrorCode.TCP_IN_PROTOCOLE;
 		}
 		waitingTCPConnections.put(key, new TCPLink());
 		clientLoginMap.get(message.getRecipient()).queueDatagram(message);
@@ -589,6 +816,50 @@ public class ChatOsServer {
     	return ErrorCode.OK;
     }
     
+    //TODO
+    /**
+     * 
+     * @brief accept the connexion of a TCP private connexion if possible
+     * @param message the tcp datagram request
+     * @param context the concerned context
+     * @param consumer the selected key (TCPKey on a consumer)
+     * @return the ErrorCode in terms of some tests
+     */
+    private byte acceptConnectionTMP(TCPDatagram message, WaitingContext context, Consumer<TCPLink> consumer) {
+    	if (!clientLoginMap.containsKey(message.getSender())) {
+    		return ErrorCode.UNREACHABLE_USER;
+    	}
+    	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
+    	if (!waitingTCPConnections.containsKey(key)) {
+    		return ErrorCode.TCP_NOT_IN_PROTOCOLE;
+    	}
+    	var link = waitingTCPConnections.get(key);
+    	consumer.accept(link);
+    	if (link.bothConnected()) {
+    		link.connect();
+    		waitingTCPConnections.remove(key);
+    	}
+    	return ErrorCode.OK;
+    }
+    
+    public byte tryTCPAccept(TCPAccept message, WaitingContext context) {
+    	Objects.requireNonNull(message);
+    	Objects.requireNonNull(context);
+    	clientLoginMap.get(message.getSender()).queueDatagram(message);
+    	return acceptConnectionTMP(message, context, (link) -> {
+        	link.connectRecipientContext(context.key, context.sc);
+    	});
+    }
+    
+    public byte tryTCPConnect(TCPConnect message, WaitingContext context) {
+    	Objects.requireNonNull(message);
+    	Objects.requireNonNull(context);
+    	System.out.println("starting TCPConnect");
+    	return acceptConnectionTMP(message, context, (link) -> {
+        	link.connectSenderContext(context.key, context.sc);
+    	});
+    }
+    
     /**
      * @brief broadcast a message (TCPAccept) to the context
      * @param message the message TCPAccept
@@ -602,6 +873,27 @@ public class ChatOsServer {
     	return acceptConnection(message, context, (key) -> {
         	var link = waitingTCPConnections.get(key);
         	link.connectRecipientContext(context.key, context.sc);
+        	if (link.bothConnected()) {
+        		link.connect();
+        		waitingTCPConnections.remove(key);
+        	}
+    	});
+    }
+    
+    /**
+     * 
+     * @brief broadcast a message (TCPConnect) to the context
+     * @param message the message TCPConnect
+     * @param context the concerned context
+     * @return the calculated ErrorCode
+     */
+    public byte broadcast(TCPConnect message, ChatContext context) {
+    	Objects.requireNonNull(message);
+    	Objects.requireNonNull(context);
+    	System.out.println("starting TCPConnect");
+    	return acceptConnection(message, context, (key) -> {
+        	var link = waitingTCPConnections.get(key);
+        	link.connectSenderContext(context.key, context.sc);
         	if (link.bothConnected()) {
         		link.connect();
         		waitingTCPConnections.remove(key);
@@ -625,29 +917,6 @@ public class ChatOsServer {
     	waitingTCPConnections.remove(key);
     	return ErrorCode.OK;
     }
-    
-    /**
-     * 
-     * @brief broadcast a message (TCPConnect) to the context
-     * @param message the message TCPConnect
-     * @param context the concerned context
-     * @return the calculated ErrorCode
-     */
-    public byte broadcast(TCPConnect message, ChatContext context) {
-    	Objects.requireNonNull(message);
-    	Objects.requireNonNull(context);
-    	System.out.println("starting TCPConnect");
-    	return acceptConnection(message, context, (key) -> {
-        	var link = waitingTCPConnections.get(key);
-        	link.connectSenderContext(context.key, context.sc);
-        	if (link.bothConnected()) {
-        		link.connect();
-        		waitingTCPConnections.remove(key);
-        	}
-    	});
-    }
-	
-	
 	/*-----------------------END OF TCP RELATED PART------------------------*/
 	
 	
@@ -662,6 +931,29 @@ public class ChatOsServer {
         serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.bind(new InetSocketAddress(port));
         selector = Selector.open();
+    }
+    
+    /**
+     * @brief Return whether or not the pseudo is available
+     * @param pseudo the pseudonym to check
+     * @return True if the pseudonyme is available.
+     */
+    public boolean isAvailable(String pseudo) {
+    	return !clientLoginMap.containsKey(pseudo);
+    }
+    
+    /**
+     * @brief Link the new created context to the pseudonym
+     * 
+     * @param pseudo the pseudonym to add
+     * @param context the context to link
+     * @throws IllegalArgumentException if the pseudonym is already taken
+     */
+    public void addChatContext(String pseudo, ChatContext context) {
+    	if (clientLoginMap.containsKey(pseudo)) {
+    		throw new IllegalArgumentException("Pseudo already taken");
+    	}
+    	clientLoginMap.put(pseudo, context);
     }
 
 	/**

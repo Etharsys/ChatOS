@@ -60,7 +60,7 @@ public class ChatOsServer {
 		void doWrite() throws IOException;
 	}
 	
-	private class WaitingContext implements Context {
+	public class WaitingContext implements Context {
 		final private SelectionKey    key;
         final private SocketChannel   sc;
         final private ByteBuffer      bbin  = ByteBuffer.allocate(BUFFER_SIZE);
@@ -73,7 +73,7 @@ public class ChatOsServer {
         //TODO pas ouf comme méthode
         private boolean done;
         
-        private WaitingContext(ChatOsServer server, SelectionKey key){
+        public WaitingContext(ChatOsServer server, SelectionKey key){
             this.key = key;
             this.sc = (SocketChannel) key.channel();
             this.server = server;
@@ -164,9 +164,10 @@ public class ChatOsServer {
         
         private void requestPseudonym(String pseudo) {
         	if (server.isAvailable(pseudo)) {
-        		var context = new ChatContext(server, key);
+        		var context = new ChatContext(server, key, pseudo);
         		context.queueDatagram(new ErrorCode(ErrorCode.OK));
         		server.addChatContext(pseudo, context);
+        		key.attach(context);
         		done = true;
         	} else {
         		queueError(ErrorCode.PSEUDO_UNAVAILABLE);
@@ -206,6 +207,7 @@ public class ChatOsServer {
         	}
     		processIn();
         	updateInterestOps();
+        	
         }
         
         /**
@@ -288,11 +290,10 @@ public class ChatOsServer {
         final private Queue<Datagram> queue = new LinkedList<>();
         final private ChatOsServer    server;
         
-        
         final private ServerDatagramVisitor visitor = new ServerDatagramVisitor();
         final private OpCodeReader          reader  = new OpCodeReader();
         
-        private Optional<String> login = Optional.empty();
+        private final String login;
         
         private boolean closed;
         
@@ -301,10 +302,14 @@ public class ChatOsServer {
          * @param server the Chat server
          * @param key the selected key to attach to this context (server)
          */
-        private ChatContext(ChatOsServer server, SelectionKey key){
+        public ChatContext(ChatOsServer server, SelectionKey key, String login){
+        	Objects.requireNonNull(server);
+        	Objects.requireNonNull(key);
+        	Objects.requireNonNull(login);
             this.key = key;
             this.sc = (SocketChannel) key.channel();
             this.server = server;
+            this.login = login;
         }
         
         /**
@@ -314,7 +319,7 @@ public class ChatOsServer {
         private void queueDatagram(Datagram datagram) {
         	queue.add(datagram);
         	System.out.println("added : " + datagram);
-        	login.ifPresent(s -> System.out.println("to : " + s));
+        	System.out.println("to : " + login);
         	updateInterestOps();
         }
         
@@ -323,7 +328,8 @@ public class ChatOsServer {
          * @param message the message to broadcast
          */
         public void broadcast(MessageAll message) {
-        	if (!message.getSender().equals(login.get())) {
+        	Objects.requireNonNull(message);
+        	if (!message.getSender().equals(login)) {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
         		return;
         	}
@@ -339,7 +345,8 @@ public class ChatOsServer {
          * @param message the message to broadcast
          */
         public void broadcast(PrivateMessage message) {
-        	if (!message.getSender().equals(login.get())) {
+        	Objects.requireNonNull(message);
+        	if (!message.getSender().equals(login)) {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
         		return;
         	}
@@ -351,7 +358,8 @@ public class ChatOsServer {
          * @param message the message to broadcast
          */
         public void broadcast(TCPAsk message) {
-        	if (!message.getSender().equals(login.get())) {
+        	Objects.requireNonNull(message);
+        	if (!message.getSender().equals(login)) {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
         		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
         		return;
@@ -364,37 +372,16 @@ public class ChatOsServer {
         }
         
         /**
-         * @brief broadcast an acceptation of the TCP private connexion request to a recipient
-         * @param message the message to broadcast
-         */
-        public void broadcast(TCPAccept message) {
-        	var code = server.broadcast(message, this);
-        	if (code != ErrorCode.OK) {
-        		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
-        	}
-        }
-        
-        /**
          * @brief broadcast a abortion of the TCP private connexion request to a recipient
          * @param message the message to broadcast
          */
         public void broadcast(TCPAbort message) {
-        	if (!message.getRecipient().equals(login.get())) {
+        	Objects.requireNonNull(message);
+        	if (!message.getRecipient().equals(login)) {
         		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
         		return;
         	}
         	queueDatagram(new ErrorCode(server.broadcast(message, this)));
-        }
-        
-        /**
-         * @brief broadcast a TCP private connexion request to a recipient
-         * @param message the message to broadcast
-         */
-        public void broadcast(TCPConnect message) {
-        	var code = server.broadcast(message, this);
-        	if (code != ErrorCode.OK) {
-        		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
-        	}
         }
         
         /**
@@ -403,33 +390,6 @@ public class ChatOsServer {
          */
         public void closeContext() {
         	closed = true;
-        }
-        
-        /**
-         * 
-         * @brief check if a client is connected by checking the presence of his login
-         * @return the presence or not of the login
-         */
-        public boolean isConnected() {
-        	return login.isPresent();
-        }
-        
-        /**
-         * 
-         * @brief check is a sender pseudonym is valid in a request
-         * @param pseudo the sender pseudo to check
-         */
-        public void requestPseudonym(String pseudo) {
-        	if (server.requestPseudonymAndAdd(pseudo, this)) {
-        		//Send OK
-        		queueDatagram(new ErrorCode(ErrorCode.OK));
-        		login = Optional.of(pseudo);
-        	} else {
-        		//Send NOT AVAILABLE
-        		queueDatagram(new ErrorCode(ErrorCode.PSEUDO_UNAVAILABLE));
-        		closed = true;
-        	}
-        	//TODO
         }
         
         /**
@@ -586,6 +546,7 @@ public class ChatOsServer {
         	}
         	if (intOps == 0) {
         		silentlyClose();
+        		pairedContext.get().closed = true;
         		return;
         	}
         	tcpContextKey.interestOps(intOps);
@@ -597,6 +558,7 @@ public class ChatOsServer {
          * @param pairedContext the second context to link
          */
         public void setPairedContext(TCPContext pairedContext) {
+        	Objects.requireNonNull(pairedContext);
         	if (this.pairedContext.isPresent()) {
         		throw new IllegalStateException("Already paired");
         	}
@@ -798,27 +760,6 @@ public class ChatOsServer {
     
     /**
      * 
-     * @brief accept the connexion of a TCP private connexion
-     * @param message the datagram request
-     * @param context the concerned context
-     * @param consumer the selected key (TCPKey on a consumer)
-     * @return the ErrorCode in terms of some tests
-     */
-    private byte acceptConnection(TCPDatagram message, ChatContext context, Consumer<TCPKey> consumer) {
-    	if (!clientLoginMap.containsKey(message.getSender())) {
-    		return ErrorCode.UNREACHABLE_USER;
-    	}
-    	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
-    	if (!waitingTCPConnections.containsKey(key)) {
-    		return ErrorCode.TCP_NOT_IN_PROTOCOLE;
-    	}
-    	consumer.accept(key);
-    	return ErrorCode.OK;
-    }
-    
-    //TODO
-    /**
-     * 
      * @brief accept the connexion of a TCP private connexion if possible
      * @param message the tcp datagram request
      * @param context the concerned context
@@ -842,41 +783,18 @@ public class ChatOsServer {
     	return ErrorCode.OK;
     }
     
-    public byte tryTCPAccept(TCPAccept message, WaitingContext context) {
-    	Objects.requireNonNull(message);
-    	Objects.requireNonNull(context);
-    	clientLoginMap.get(message.getSender()).queueDatagram(message);
-    	return acceptConnectionTMP(message, context, (link) -> {
-        	link.connectRecipientContext(context.key, context.sc);
-    	});
-    }
-    
-    public byte tryTCPConnect(TCPConnect message, WaitingContext context) {
-    	Objects.requireNonNull(message);
-    	Objects.requireNonNull(context);
-    	System.out.println("starting TCPConnect");
-    	return acceptConnectionTMP(message, context, (link) -> {
-        	link.connectSenderContext(context.key, context.sc);
-    	});
-    }
-    
     /**
      * @brief broadcast a message (TCPAccept) to the context
      * @param message the message TCPAccept
      * @param context the context to change to TCPContext
      * @return the ErrorCode calculated
      */
-    public byte broadcast(TCPAccept message, ChatContext context) {
+    public byte tryTCPAccept(TCPAccept message, WaitingContext context) {
     	Objects.requireNonNull(message);
     	Objects.requireNonNull(context);
     	clientLoginMap.get(message.getSender()).queueDatagram(message);
-    	return acceptConnection(message, context, (key) -> {
-        	var link = waitingTCPConnections.get(key);
+    	return acceptConnectionTMP(message, context, (link) -> {
         	link.connectRecipientContext(context.key, context.sc);
-        	if (link.bothConnected()) {
-        		link.connect();
-        		waitingTCPConnections.remove(key);
-        	}
     	});
     }
     
@@ -887,17 +805,12 @@ public class ChatOsServer {
      * @param context the concerned context
      * @return the calculated ErrorCode
      */
-    public byte broadcast(TCPConnect message, ChatContext context) {
+    public byte tryTCPConnect(TCPConnect message, WaitingContext context) {
     	Objects.requireNonNull(message);
     	Objects.requireNonNull(context);
     	System.out.println("starting TCPConnect");
-    	return acceptConnection(message, context, (key) -> {
-        	var link = waitingTCPConnections.get(key);
+    	return acceptConnectionTMP(message, context, (link) -> {
         	link.connectSenderContext(context.key, context.sc);
-        	if (link.bothConnected()) {
-        		link.connect();
-        		waitingTCPConnections.remove(key);
-        	}
     	});
     }
     
@@ -950,6 +863,7 @@ public class ChatOsServer {
      * @throws IllegalArgumentException if the pseudonym is already taken
      */
     public void addChatContext(String pseudo, ChatContext context) {
+    	logger.info("Adding a new ChatContext");
     	if (clientLoginMap.containsKey(pseudo)) {
     		throw new IllegalArgumentException("Pseudo already taken");
     	}
@@ -1048,9 +962,7 @@ public class ChatOsServer {
 			silentlyClose(key);
 			if (key.attachment() instanceof ChatContext) {
 				var login = ((ChatContext)key.attachment()).login;
-				if (login.isPresent()) {
-					clientLoginMap.remove(login.get());
-				}
+				clientLoginMap.remove(login);
 			}
 		}
 	}
@@ -1069,7 +981,7 @@ public class ChatOsServer {
 		}
 		sc.configureBlocking(false);
 		var newKey = sc.register(selector, SelectionKey.OP_READ);
-		newKey.attach(new ChatContext(this,newKey));
+		newKey.attach(new WaitingContext(this,newKey));
     }
     
     /**

@@ -20,14 +20,11 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 	@Override
 	public void visit(ConnectionRequestReader reader, ChatContext context) {
 		System.out.println("Server received ConnectionRequest with the login : " + reader.get());
-		context.requestPseudonym(reader.get());
+		//TODO nothing (renvoyer ALREADYCONNECTED)
 	}
 
 	@Override
 	public void visit(SendPrivateMessageReader reader, ChatContext context) {
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
 		var message = reader.get();
 		System.out.println("Server received PrivateMessage with the login : " );
 		System.out.println("from : " + message.getSender());
@@ -38,9 +35,6 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 
 	@Override
 	public void visit(SendMessageAllReader reader, ChatContext context) {
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
 		var message = reader.get();
 		System.out.println("Server received Message to All with the login : " );
 		System.out.println("from : " + message.getSender());
@@ -50,17 +44,11 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 
 	@Override
 	public void visit(ErrorCodeReader reader, ChatContext context) {
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
 		System.out.println("Received an error with op code : " + reader.get());
 	}
 
 	@Override
 	public void visit(TCPAskReader reader, ChatContext context) {
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
 		TCPAsk tcpAsk = reader.get();
 		System.out.println("Received a TCPAsk with the arguments : ");
 		System.out.println("Sender    : " + tcpAsk.getSender());
@@ -71,9 +59,6 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 	
 	@Override
 	public void visit(TCPAbortReader reader, ChatContext context) {
-		if (!context.isConnected()) {
-			context.closeContext();
-		}
 		TCPAbort tcpAbort = reader.get();
 		System.out.println("Received a TCPAbort with the arguments : ");
 		System.out.println("Sender    : " + tcpAbort.getSender());
@@ -89,7 +74,7 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 		System.out.println("Sender    : " + tcpConnect.getSender());
 		System.out.println("Recipient : " + tcpConnect.getRecipient());
 		System.out.println("Password  : " + tcpConnect.getPassword());
-		context.broadcast(tcpConnect);
+		//Do nothing
 	}
 
 	@Override
@@ -99,6 +84,6 @@ public class ServerDatagramVisitor implements DatagramVisitor<ChatContext> {
 		System.out.println("Sender    : " + tcpAccept.getSender());
 		System.out.println("Recipient : " + tcpAccept.getRecipient());
 		System.out.println("Password  : " + tcpAccept.getPassword());
-		context.broadcast(tcpAccept);
+		//do nothin return error?
 	}
 }

@@ -44,9 +44,8 @@ class ChatContext implements Context {
     	public void visit(ConnectionRequestReader reader, ChatContext context) {
     		Objects.requireNonNull(reader);
     		Objects.requireNonNull(context);
-    		System.out.println("Server received ConnectionRequest with the login : " + reader.get());
-    		logger.info("ReceivedConnectionRequest");
-    		//TODO nothing (renvoyer ALREADYCONNECTED)
+    		logger.info("Received ConnectionRequest");
+    		context.queueFrame(new ErrorCode(ErrorCode.ALREADY_CONNECTED));
     	}
 
     	@Override
@@ -69,36 +68,38 @@ class ChatContext implements Context {
     	public void visit(ErrorCodeReader reader, ChatContext context) {
     		Objects.requireNonNull(reader);
     		Objects.requireNonNull(context);
-    		System.out.println("Received an Error from the server : ");
-    		switch(reader.get().getErrorCode()) {
-    		case ErrorCode.ALREADY_CONNECTED:
-    			System.out.println("ALREADY_CONNECTED");
-    			break;
-    		case ErrorCode.INVALID_PSEUDONYM:
-    			System.out.println("INVALID_PSEUDONYM");
-    			break;
-    		case ErrorCode.NOT_CONNECTED:
-    			System.out.println("NOT_CONNECTED");
-    			break;
-    		case ErrorCode.OK:
-    			System.out.println("OK");
-    			break;
-    		case ErrorCode.PSEUDO_UNAVAILABLE:
-    			System.out.println("PSEUDO_UNAVAILABLE");
-    			break;
-    		case ErrorCode.TCP_IN_PROTOCOLE:
-    			System.out.println("TCP_IN_PROTOCOLE");
-    			break;
-    		case ErrorCode.TCP_NOT_IN_PROTOCOLE:
-    			System.out.println("TCP_NOT_IN_PROTOCOLE");
-    			break;
-    		case ErrorCode.UNREACHABLE_USER:
-    			System.out.println("UNREACHABLE_USER");
-    			break;
-    		default:
-    			System.out.println("UNKNOWN");
-    			break;
-    		}
+    		logger.info("Received ErrorCode");
+    		//Do nothing
+//    		System.out.println("Received an Error from the server : ");
+//    		switch(reader.get().getErrorCode()) {
+//    		case ErrorCode.ALREADY_CONNECTED:
+//    			System.out.println("ALREADY_CONNECTED");
+//    			break;
+//    		case ErrorCode.INVALID_PSEUDONYM:
+//    			System.out.println("INVALID_PSEUDONYM");
+//    			break;
+//    		case ErrorCode.NOT_CONNECTED:
+//    			System.out.println("NOT_CONNECTED");
+//    			break;
+//    		case ErrorCode.OK:
+//    			System.out.println("OK");
+//    			break;
+//    		case ErrorCode.PSEUDO_UNAVAILABLE:
+//    			System.out.println("PSEUDO_UNAVAILABLE");
+//    			break;
+//    		case ErrorCode.TCP_IN_PROTOCOLE:
+//    			System.out.println("TCP_IN_PROTOCOLE");
+//    			break;
+//    		case ErrorCode.TCP_NOT_IN_PROTOCOLE:
+//    			System.out.println("TCP_NOT_IN_PROTOCOLE");
+//    			break;
+//    		case ErrorCode.UNREACHABLE_USER:
+//    			System.out.println("UNREACHABLE_USER");
+//    			break;
+//    		default:
+//    			System.out.println("UNKNOWN");
+//    			break;
+//    		}
     	}
 
     	@Override
@@ -121,14 +122,16 @@ class ChatContext implements Context {
     	public void visit(TCPConnectReader reader, ChatContext context) {
     		Objects.requireNonNull(reader);
     		Objects.requireNonNull(context);
-    		logger.info("Received TCPConnect");//Return an Error/Do nothing?
+    		logger.info("Received TCPConnect");
+    		context.queueFrame(new ErrorCode(ErrorCode.TCP_NOT_IN_PROTOCOLE));
     	}
 
     	@Override
     	public void visit(TCPAcceptReader reader, ChatContext context) {
     		Objects.requireNonNull(reader);
     		Objects.requireNonNull(context);
-    		logger.info("Received TCPAccept");//Return an Error/Do nothing?
+    		logger.info("Received TCPAccept");
+    		context.queueFrame(new ErrorCode(ErrorCode.TCP_NOT_IN_PROTOCOLE));
     	}
     };
 
@@ -143,14 +146,16 @@ class ChatContext implements Context {
      * @param server the Chat server
      * @param key the selected key to attach to this context (server)
      */
-    public ChatContext(ChatOsServer server, SelectionKey key, String login){
+    public ChatContext(ChatOsServer server, SelectionKey key, String login, ByteBuffer buffer){
     	Objects.requireNonNull(server);
     	Objects.requireNonNull(key);
     	Objects.requireNonNull(login);
+    	Objects.requireNonNull(buffer);
         this.key = key;
         this.sc = (SocketChannel) key.channel();
         this.server = server;
         this.login = login;
+        this.bbin.put(buffer);
     }
 
     /**

@@ -40,10 +40,12 @@ class WaitingContext implements Context {
     
     final private OpCodeReader reader  = new OpCodeReader();
     
-    //TODO pas ouf comme méthode
+    //TODO Ca me parrait pas si mal au final mais c'est pas le meilleur truc je pense
     private boolean done;
         
     public WaitingContext(ChatOsServer server, SelectionKey key){
+    	Objects.requireNonNull(server);
+    	Objects.requireNonNull(key);
         this.key = key;
         this.sc = (SocketChannel) key.channel();
         this.server = server;
@@ -53,7 +55,6 @@ class WaitingContext implements Context {
     final private DatagramVisitor<WaitingContext> visitor = new DatagramVisitor<WaitingContext>() {
 		@Override
 		public void visit(ConnectionRequestReader reader, WaitingContext context) {
-			// TODO Auto-generated method stub
 			Objects.requireNonNull(reader);
 			Objects.requireNonNull(context);
 			requestPseudonym(reader.get());
@@ -98,7 +99,6 @@ class WaitingContext implements Context {
 		public void visit(TCPConnectReader reader, WaitingContext context) {
 			Objects.requireNonNull(reader);
 			Objects.requireNonNull(context);
-			// TODO Auto-generated method stub
 			computeTCPConnect(reader.get());
 		}
 
@@ -106,35 +106,54 @@ class WaitingContext implements Context {
 		public void visit(TCPAcceptReader reader, WaitingContext context) {
 			Objects.requireNonNull(reader);
 			Objects.requireNonNull(context);
-			// TODO Auto-generated method stub
 			computeTCPAccept(reader.get());
 		}
         	
     };
-        
-    private void computeTCPDatagramAnswer(byte error) {
+
+    /**
+     * Test whether or not the error is OK, if it is mark this context as done, relay the error otherwise
+     * @param error the error to test
+     */
+    private void computeTCPFrameAnswer(byte error) {
     	if (error == ErrorCode.OK) {
     		done = true;
     	} else {
     		queueError(error);
     	}
     }
-        
+
+    /**
+     * Compute what to do with a TCPAccept message
+     * @param message the message to compute
+     */
     private void computeTCPAccept(TCPAccept message) {
-    	computeTCPDatagramAnswer(server.tryTCPAccept(message, key, sc));
+    	computeTCPFrameAnswer(server.tryTCPAccept(message, key, sc));
     }
-        
+
+    /**
+     * Compute what to do with a TCPConnect message
+     * @param message the message to compute
+     */
     private void computeTCPConnect(TCPConnect message) {
-    	computeTCPDatagramAnswer(server.tryTCPConnect(message, key, sc));
+    	computeTCPFrameAnswer(server.tryTCPConnect(message, key, sc));
     }
-        
+
+    /**
+     * Add an Error to the queue using the given error
+     * @param error the error to queue
+     */
     private void queueError(byte error) {
     	queue.add(new ErrorCode(error));
     }
-        
+
+    /**
+     * Test if a pseudonym is available and add a new context using it if it is
+     * @param pseudo the pseudonym to add
+     */
     private void requestPseudonym(String pseudo) {
     	if (server.isAvailable(pseudo)) {
-    		var context = new ChatContext(server, key, pseudo);
+    		var context = new ChatContext(server, key, pseudo, bbin.flip());
     		context.queueFrame(new ErrorCode(ErrorCode.OK));
     		server.addChatContext(pseudo, context);
     		key.attach(context);
@@ -143,7 +162,11 @@ class WaitingContext implements Context {
     		queueError(ErrorCode.PSEUDO_UNAVAILABLE);
     	}
     }
-        
+
+    /**
+     * 
+	 * @brief update the interestOps of the key
+	 */
     private void updateInterestOps() {
     	if (done) {
     		return;
@@ -161,7 +184,7 @@ class WaitingContext implements Context {
     	}
     	key.interestOps(intOps);
     }
-        
+
     /**
      * @brief Performs the read action on sc
      *
@@ -179,7 +202,7 @@ class WaitingContext implements Context {
     	updateInterestOps();
     	
     }
-        
+
     /**
      * @brief Process the content of bbin
      *
@@ -199,7 +222,7 @@ class WaitingContext implements Context {
 			}
 		}
     }
-        
+
     /**
      * @brief Try to fill bbout from the queue
      *
@@ -237,7 +260,7 @@ class WaitingContext implements Context {
     	bbout.compact();
     	updateInterestOps();
     }
-		
+
 	/**
      * 
 	 * @brief silently close the socket channel

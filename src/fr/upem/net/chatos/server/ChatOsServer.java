@@ -12,493 +12,24 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import fr.upem.net.chatos.datagram.Datagram;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.MessageAll;
 import fr.upem.net.chatos.datagram.PrivateMessage;
+import fr.upem.net.chatos.datagram.TCPAbort;
 import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
 import fr.upem.net.chatos.datagram.TCPDatagram;
-import fr.upem.net.chatos.reader.ConnectionRequestReader;
-import fr.upem.net.chatos.reader.DatagramVisitor;
-import fr.upem.net.chatos.reader.ErrorCodeReader;
-import fr.upem.net.chatos.reader.OpCodeReader;
-import fr.upem.net.chatos.reader.Reader.ProcessStatus;
-import fr.upem.net.chatos.reader.SendMessageAllReader;
-import fr.upem.net.chatos.reader.SendPrivateMessageReader;
-import fr.upem.net.chatos.reader.TCPAbortReader;
-import fr.upem.net.chatos.reader.TCPAcceptReader;
-import fr.upem.net.chatos.reader.TCPAskReader;
-import fr.upem.net.chatos.reader.TCPConnectReader;
-import fr.upem.net.chatos.datagram.TCPAbort;
 
 
 public class ChatOsServer {
-	
-	private interface Context {
-		
-		/**
-		 * @brief read from the socket channel (bbin should be in write mode before and after)
-		 * @throws IOException when read throws it
-		 */
-		void doRead()  throws IOException;
-		
-		/**
-		 * @brief write to the socket channel (bbout should be in write mode before and after)
-		 * @throws IOException when write throws it
-		 */
-		void doWrite() throws IOException;
-	}
-	
-	public class WaitingContext implements Context {
-		final private SelectionKey    key;
-        final private SocketChannel   sc;
-        final private ByteBuffer      bbin  = ByteBuffer.allocate(BUFFER_SIZE);
-        final private ByteBuffer      bbout = ByteBuffer.allocate(BUFFER_SIZE);
-        final private Queue<Datagram> queue = new LinkedList<>();
-        final private ChatOsServer    server;
-        
-        private boolean closed;
-        
-        //TODO pas ouf comme méthode
-        private boolean done;
-        
-        public WaitingContext(ChatOsServer server, SelectionKey key){
-            this.key = key;
-            this.sc = (SocketChannel) key.channel();
-            this.server = server;
-        }
-        
-        final private OpCodeReader          reader  = new OpCodeReader();
-        final private DatagramVisitor<WaitingContext> visitor = new DatagramVisitor<WaitingContext>() {
-			@Override
-			public void visit(ConnectionRequestReader reader, WaitingContext context) {
-				// TODO Auto-generated method stub
-				Objects.requireNonNull(reader);
-				Objects.requireNonNull(context);
-				requestPseudonym(reader.get());
-			}
-			
-			@Override
-			public void visit(SendPrivateMessageReader reader, WaitingContext context) {
-				Objects.requireNonNull(reader);
-				Objects.requireNonNull(context);
-				queueError(ErrorCode.NOT_CONNECTED);
-			}
-
-			@Override
-			public void visit(SendMessageAllReader reader, WaitingContext context) {
-				Objects.requireNonNull(reader);
-				Objects.requireNonNull(context);
-				queueError(ErrorCode.NOT_CONNECTED);
-			}
-
-			@Override
-			public void visit(ErrorCodeReader reader, WaitingContext context) {
-				Objects.requireNonNull(reader);
-				Objects.requireNonNull(context);
-				queueError(ErrorCode.NOT_CONNECTED);
-			}
-
-			@Override
-			public void visit(TCPAskReader reader, WaitingContext context) {
-				Objects.requireNonNull(reader);
-				Objects.requireNonNull(context);
-				queueError(ErrorCode.NOT_CONNECTED);
-			}
-
-			@Override
-			public void visit(TCPAbortReader reader, WaitingContext context) {
-				Objects.requireNonNull(reader);
-				Objects.requireNonNull(context);
-				queueError(ErrorCode.NOT_CONNECTED);
-			}
-
-			@Override
-			public void visit(TCPConnectReader reader, WaitingContext context) {
-				Objects.requireNonNull(reader);
-				Objects.requireNonNull(context);
-				// TODO Auto-generated method stub
-				computeTCPConnect(reader.get());
-			}
-
-			@Override
-			public void visit(TCPAcceptReader reader, WaitingContext context) {
-				Objects.requireNonNull(reader);
-				Objects.requireNonNull(context);
-				// TODO Auto-generated method stub
-				computeTCPAccept(reader.get());
-			}
-        	
-        };
-        
-        private void computeTCPDatagramAnswer(byte error) {
-        	if (error == ErrorCode.OK) {
-        		done = true;
-        	} else {
-        		queueError(error);
-        	}
-        }
-        
-        private void computeTCPAccept(TCPAccept message) {
-        	computeTCPDatagramAnswer(tryTCPAccept(message, this));
-        }
-        
-        private void computeTCPConnect(TCPConnect message) {
-        	computeTCPDatagramAnswer(tryTCPConnect(message, this));
-        }
-        
-        private void queueError(byte error) {
-        	queue.add(new ErrorCode(error));
-        }
-        
-        private void requestPseudonym(String pseudo) {
-        	if (server.isAvailable(pseudo)) {
-        		var context = new ChatContext(server, key, pseudo);
-        		context.queueDatagram(new ErrorCode(ErrorCode.OK));
-        		server.addChatContext(pseudo, context);
-        		key.attach(context);
-        		done = true;
-        	} else {
-        		queueError(ErrorCode.PSEUDO_UNAVAILABLE);
-        	}
-        }
-        
-        private void updateInterestOps() {
-        	if (done) {
-        		return;
-        	}
-        	int intOps = 0;
-        	if (!closed && bbin.hasRemaining()) {
-        		intOps |= SelectionKey.OP_READ;
-        	}
-        	if (bbout.position() > 0 || queue.size() != 0) {
-        		intOps |= SelectionKey.OP_WRITE;
-        	}
-        	if (intOps == 0) {
-        		silentlyClose();
-        		return;
-        	}
-        	key.interestOps(intOps);
-        }
-        
-        /**
-         * @brief Performs the read action on sc
-         *
-         * The convention is that both buffers are in write-mode before the call
-         * to doRead and after the call
-         *
-         * @throws IOException
-         */
-        @Override
-        public void doRead() throws IOException {
-        	if (sc.read(bbin) == -1) {
-        		closed = true;
-        	}
-    		processIn();
-        	updateInterestOps();
-        	
-        }
-        
-        /**
-         * @brief Process the content of bbin
-         *
-         * The convention is that bbin is in write-mode before the call
-         * to process and after the call
-         *
-         */
-        private void processIn() {
-        	var ps = reader.process(bbin);
-			if (ps != ProcessStatus.REFILL) {
-				if (ps == ProcessStatus.ERROR) {
-					silentlyClose();
-					return;
-				} else {
-					reader.accept(visitor, this);
-					reader.reset();
-				}
-			}
-        }
-        
-        /**
-         * @brief Try to fill bbout from the queue
-         *
-         */
-        private void processOut() {
-    		while (!queue.isEmpty()) {
-				var datagram = queue.peek();
-				var optBB = datagram.toByteBuffer(logger);
-				if (optBB.isEmpty()) {
-					queue.remove();
-				}
-				var bb = optBB.get();
-				if (bb.remaining() <= bbout.remaining()) {
-					queue.remove();
-					bbout.put(bb);
-				} else {
-					break;
-				}
-			}
-        }
-
-		/**	
-         * @brief Performs the write action on sc
-         *
-         * The convention is that both buffers are in write-mode before the call
-         * to doWrite and after the call
-         *
-         * @throws IOException
-         */
-        @Override
-        public void doWrite() throws IOException {
-        	processOut();
-        	bbout.flip();
-        	sc.write(bbout);
-        	bbout.compact();
-        	updateInterestOps();
-        }
-		
-		/**
-         * 
-		 * @brief silently close the socket channel
-		 */
-        private void silentlyClose() {
-            try {
-                sc.close();
-            } catch (IOException e) {
-                // ignore exception
-            }
-        }
-	}
-	
-	public class ChatContext implements Context {
-		
-        final private SelectionKey    key;
-        final private SocketChannel   sc;
-        final private ByteBuffer      bbin  = ByteBuffer.allocate(BUFFER_SIZE);
-        final private ByteBuffer      bbout = ByteBuffer.allocate(BUFFER_SIZE);
-        final private Queue<Datagram> queue = new LinkedList<>();
-        final private ChatOsServer    server;
-        
-        final private ServerDatagramVisitor visitor = new ServerDatagramVisitor();
-        final private OpCodeReader          reader  = new OpCodeReader();
-        
-        private final String login;
-        
-        private boolean closed;
-        
-        /**
-         * ChatContext constructor
-         * @param server the Chat server
-         * @param key the selected key to attach to this context (server)
-         */
-        public ChatContext(ChatOsServer server, SelectionKey key, String login){
-        	Objects.requireNonNull(server);
-        	Objects.requireNonNull(key);
-        	Objects.requireNonNull(login);
-            this.key = key;
-            this.sc = (SocketChannel) key.channel();
-            this.server = server;
-            this.login = login;
-        }
-        
-        /**
-         * @brief Add a datagram to the queue
-         * @param datagram the command to add
-         */
-        private void queueDatagram(Datagram datagram) {
-        	queue.add(datagram);
-        	System.out.println("added : " + datagram);
-        	System.out.println("to : " + login);
-        	updateInterestOps();
-        }
-        
-        /**
-         * @brief broadcast a message to every client connected Send back Invalid Pseudonym if the sender is not associated with this context
-         * @param message the message to broadcast
-         */
-        public void broadcast(MessageAll message) {
-        	Objects.requireNonNull(message);
-        	if (!message.getSender().equals(login)) {
-        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
-        		return;
-        	}
-        	server.broadcast(message, this);
-        	queueDatagram(new ErrorCode(ErrorCode.OK));
-        }
-        
-        /**
-         * @brief broadcast a message to a recipient if it is connected
-         * send an ERROR packet to the client "OK" if the recipient is connected and
-         * Unreachable User otherwise
-         * Send back Invalid Pseudonym if the sender is not associated with this context
-         * @param message the message to broadcast
-         */
-        public void broadcast(PrivateMessage message) {
-        	Objects.requireNonNull(message);
-        	if (!message.getSender().equals(login)) {
-        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
-        		return;
-        	}
-    		queueDatagram(new ErrorCode(server.broadcast(message)));
-        }
-        
-        /**
-         * @brief broadcast a TCP private connexion ask request to a recipient
-         * @param message the message to broadcast
-         */
-        public void broadcast(TCPAsk message) {
-        	Objects.requireNonNull(message);
-        	if (!message.getSender().equals(login)) {
-        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
-        		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
-        		return;
-        	}
-        	var code = server.broadcast(message);
-        	queueDatagram(new ErrorCode(code));
-        	if (code != ErrorCode.OK) {
-        		queueDatagram(new TCPAbort(message.getSender(), message.getRecipient(), message.getPassword()));
-        	}
-        }
-        
-        /**
-         * @brief broadcast a abortion of the TCP private connexion request to a recipient
-         * @param message the message to broadcast
-         */
-        public void broadcast(TCPAbort message) {
-        	Objects.requireNonNull(message);
-        	if (!message.getRecipient().equals(login)) {
-        		queueDatagram(new ErrorCode(ErrorCode.INVALID_PSEUDONYM));
-        		return;
-        	}
-        	queueDatagram(new ErrorCode(server.broadcast(message, this)));
-        }
-        
-        /**
-         * 
-         * @brief close the context
-         */
-        public void closeContext() {
-        	closed = true;
-        }
-        
-        /**
-         * 
-		 * @brief update the interestOps of the key
-		 */
-        private void updateInterestOps() {
-        	int intOps = 0;
-        	if (!closed && bbin.hasRemaining()) {
-        		intOps |= SelectionKey.OP_READ;
-        	}
-        	if (bbout.position() > 0 || queue.size() != 0) {
-        		intOps |= SelectionKey.OP_WRITE;
-        	}
-        	if (intOps == 0) {
-        		silentlyClose();
-        		return;
-        	}
-        	key.interestOps(intOps);
-        }
-        
-        /**
-         * 
-		 * @brief silently close the socket channel
-		 */
-        private void silentlyClose() {
-            try {
-                sc.close();
-            } catch (IOException e) {
-                // ignore exception
-            }
-        }
-        
-        /**
-         * @brief Performs the read action on sc
-         *
-         * The convention is that both buffers are in write-mode before the call
-         * to doRead and after the call
-         *
-         * @throws IOException
-         */
-        @Override
-        public void doRead() throws IOException {
-        	if (sc.read(bbin) == -1) {
-        		closed = true;
-        	}
-    		processIn();
-        	updateInterestOps();
-        }
-        
-        /**
-         * @brief Process the content of bbin
-         *
-         * The convention is that bbin is in write-mode before the call
-         * to process and after the call
-         *
-         */
-        private void processIn() {
-			for (var ps = reader.process(bbin); ps != ProcessStatus.REFILL; ps = reader.process(bbin)) {
-				if (ps == ProcessStatus.ERROR) {
-					silentlyClose();
-					return;
-				} else {
-					reader.accept(visitor, this);
-					reader.reset();
-				}
-			}
-        }
-        
-        /**
-         * @brief Try to fill bbout from the queue
-         *
-         */
-        private void processOut() {
-    		while (!queue.isEmpty()) {
-				var datagram = queue.peek();
-				var optBB = datagram.toByteBuffer(logger);
-				if (optBB.isEmpty()) {
-					queue.remove();
-				}
-				var bb = optBB.get();
-				if (bb.remaining() <= bbout.remaining()) {
-					queue.remove();
-					bbout.put(bb);
-				} else {
-					break;
-				}
-			}
-        }
-
-		/**	
-         * @brief Performs the write action on sc
-         *
-         * The convention is that both buffers are in write-mode before the call
-         * to doWrite and after the call
-         *
-         * @throws IOException
-         */
-        @Override
-        public void doWrite() throws IOException {
-        	processOut();
-        	bbout.flip();
-        	sc.write(bbout);
-        	bbout.compact();
-        	updateInterestOps();
-        }
-	}
-	
-	/*--------------------TCP RELATED PART-------------------------*/
 	private class TCPContext implements Context {
 		
 		private Optional<TCPContext> pairedContext = Optional.empty();
@@ -569,7 +100,7 @@ public class ChatOsServer {
          * 
 		 * @brief silently close the socket channel
 		 */
-        private void silentlyClose() {
+        public void silentlyClose() {
             try {
                 socketChannel.close();
             } catch (IOException e) {
@@ -734,7 +265,7 @@ public class ChatOsServer {
 			return ErrorCode.TCP_IN_PROTOCOLE;
 		}
 		waitingTCPConnections.put(key, new TCPLink());
-		clientLoginMap.get(message.getRecipient()).queueDatagram(message);
+		clientLoginMap.get(message.getRecipient()).queueFrame(message);
     	return ErrorCode.OK;
 	}
     
@@ -746,15 +277,16 @@ public class ChatOsServer {
      */
     public byte broadcast(TCPAbort message) {
     	Objects.requireNonNull(message);
-    	if (!clientLoginMap.containsKey(message.getSender())) {
-    		return ErrorCode.UNREACHABLE_USER;
-    	}
+    	
     	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
     	if (!waitingTCPConnections.containsKey(key)) {
     		return ErrorCode.TCP_NOT_IN_PROTOCOLE;
     	}
-    	clientLoginMap.get(message.getSender()).queueDatagram(message);
     	waitingTCPConnections.remove(key).close();
+    	if (!clientLoginMap.containsKey(message.getSender())) {
+    		return ErrorCode.UNREACHABLE_USER;
+    	}
+    	clientLoginMap.get(message.getSender()).queueFrame(message);
     	return ErrorCode.OK;
     }
     
@@ -766,7 +298,7 @@ public class ChatOsServer {
      * @param consumer the selected key (TCPKey on a consumer)
      * @return the ErrorCode in terms of some tests
      */
-    private byte acceptConnectionTMP(TCPDatagram message, WaitingContext context, Consumer<TCPLink> consumer) {
+    private byte acceptConnectionTMP(TCPDatagram message, Consumer<TCPLink> consumer) {
     	if (!clientLoginMap.containsKey(message.getSender())) {
     		return ErrorCode.UNREACHABLE_USER;
     	}
@@ -789,12 +321,13 @@ public class ChatOsServer {
      * @param context the context to change to TCPContext
      * @return the ErrorCode calculated
      */
-    public byte tryTCPAccept(TCPAccept message, WaitingContext context) {
+    public byte tryTCPAccept(TCPAccept message, SelectionKey key, SocketChannel sc) {
     	Objects.requireNonNull(message);
-    	Objects.requireNonNull(context);
-    	clientLoginMap.get(message.getSender()).queueDatagram(message);
-    	return acceptConnectionTMP(message, context, (link) -> {
-        	link.connectRecipientContext(context.key, context.sc);
+    	Objects.requireNonNull(key);
+    	Objects.requireNonNull(sc);
+    	clientLoginMap.get(message.getSender()).queueFrame(message);
+    	return acceptConnectionTMP(message, (link) -> {
+        	link.connectRecipientContext(key, sc);
     	});
     }
     
@@ -805,30 +338,14 @@ public class ChatOsServer {
      * @param context the concerned context
      * @return the calculated ErrorCode
      */
-    public byte tryTCPConnect(TCPConnect message, WaitingContext context) {
+    public byte tryTCPConnect(TCPConnect message, SelectionKey key, SocketChannel sc) {
     	Objects.requireNonNull(message);
-    	Objects.requireNonNull(context);
+    	Objects.requireNonNull(key);
+    	Objects.requireNonNull(sc);
     	System.out.println("starting TCPConnect");
-    	return acceptConnectionTMP(message, context, (link) -> {
-        	link.connectSenderContext(context.key, context.sc);
+    	return acceptConnectionTMP(message, (link) -> {
+        	link.connectSenderContext(key, sc);
     	});
-    }
-    
-    /**
-     * 
-     * @brief broadcast a message (TCPAbort) to the context
-     * @param message the message TCPAbort
-     * @param context the concerned context
-     * @return the calculated ErrorCode
-     */
-    public byte broadcast(TCPAbort message, ChatContext context) {
-    	var key = new TCPKey(message.getSender(), message.getRecipient(), message.getPassword());
-    	if (!waitingTCPConnections.containsKey(key)) {
-    		return ErrorCode.TCP_NOT_IN_PROTOCOLE;
-    	}
-    	clientLoginMap.get(message.getSender()).queueDatagram(message);
-    	waitingTCPConnections.remove(key);
-    	return ErrorCode.OK;
     }
 	/*-----------------------END OF TCP RELATED PART------------------------*/
 	
@@ -896,7 +413,7 @@ public class ChatOsServer {
     		return ErrorCode.UNREACHABLE_USER;
     	} else {
     		var context = clientLoginMap.get(message.getRecipient());
-    		context.queueDatagram(message);
+    		context.queueFrame(message);
     		return ErrorCode.OK;
     	}
     }
@@ -906,13 +423,13 @@ public class ChatOsServer {
      * @param message the message to broadcast
      * @param sender SelectionKey of the sender 
      */
-    public void broadcast(MessageAll message, ChatContext sender) {
+    public void broadcast(MessageAll message, SelectionKey senderKey) {
     	Objects.requireNonNull(message);
-    	Objects.requireNonNull(sender);
+    	Objects.requireNonNull(senderKey);
     	for (SelectionKey key : selector.keys()) {
-    		if (key.isValid() && !key.isAcceptable() && !key.equals(sender.key) && key.attachment() instanceof ChatContext) {
+    		if (key.isValid() && !key.isAcceptable() && !key.equals(senderKey) && key.attachment() instanceof ChatContext) {
     			var context = (ChatContext) key.attachment();
-    			context.queueDatagram(message);
+    			context.queueFrame(message);
     		}
     	}
     }
@@ -961,7 +478,7 @@ public class ChatOsServer {
 			logger.log(Level.INFO,"Connection closed with client due to IOException",e);
 			silentlyClose(key);
 			if (key.attachment() instanceof ChatContext) {
-				var login = ((ChatContext)key.attachment()).login;
+				var login = ((ChatContext)key.attachment()).getLogin();
 				clientLoginMap.remove(login);
 			}
 		}

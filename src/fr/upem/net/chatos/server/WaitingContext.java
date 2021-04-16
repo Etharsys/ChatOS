@@ -156,7 +156,6 @@ class WaitingContext implements Context {
     		var context = new ChatContext(server, key, pseudo, bbin.flip());
     		context.queueFrame(new ErrorCode(ErrorCode.OK));
     		server.addChatContext(pseudo, context);
-    		key.attach(context);
     		done = true;
     	} else {
     		queueError(ErrorCode.PSEUDO_UNAVAILABLE);

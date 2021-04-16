@@ -3,7 +3,6 @@ package fr.upem.net.chatos.server;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
@@ -30,105 +29,7 @@ import fr.upem.net.chatos.datagram.TCPDatagram;
 
 
 public class ChatOsServer {
-	private class TCPContext implements Context {
-		
-		private Optional<TCPContext> pairedContext = Optional.empty();
-		
-		private final SelectionKey  tcpContextKey;
-		private final SocketChannel socketChannel;
-		private final ByteBuffer    bbout = ByteBuffer.allocate(BUFFER_SIZE);
-        
-		private boolean closed;
-        
-		/**
-		 * TCPContext constructor
-		 * @param tcpContextKey the selected key to attach to this context
-		 * @param socketChannel the original socket channel
-		 */
-        public TCPContext(SelectionKey tcpContextKey, SocketChannel socketChannel) {
-			Objects.requireNonNull(tcpContextKey);
-			Objects.requireNonNull(socketChannel);
-			this.tcpContextKey = tcpContextKey;
-			this.socketChannel = socketChannel;
-			tcpContextKey.attach(this);
-		}
-        
-        /**
-         * 
-		 * @brief update the interestOps of the key
-		 */
-        private void updateInterests() {
-        	updateInterestOps();
-        	pairedContext.get().updateInterestOps();
-        }
-        
-        /**
-         * 
-		 * @brief update the interestOps of the key
-		 */
-        //TODO deconnecter l'autre en cas de d�connection de l'un
-        private void updateInterestOps() {
-        	int intOps = 0;
-        	if (!closed && pairedContext.get().bbout.hasRemaining()) {
-        		intOps |= SelectionKey.OP_READ;
-        	}
-        	if (bbout.position() != 0){
-        		intOps |= SelectionKey.OP_WRITE;
-        	}
-        	if (intOps == 0) {
-        		silentlyClose();
-        		pairedContext.get().closed = true;
-        		return;
-        	}
-        	tcpContextKey.interestOps(intOps);
-        }
-        
-        /**
-         * 
-         * @brief set a link of the TCP private connexion between this context and an other
-         * @param pairedContext the second context to link
-         */
-        public void setPairedContext(TCPContext pairedContext) {
-        	Objects.requireNonNull(pairedContext);
-        	if (this.pairedContext.isPresent()) {
-        		throw new IllegalStateException("Already paired");
-        	}
-			this.pairedContext = Optional.of(pairedContext);
-		}
-        
-        /**
-         * 
-		 * @brief silently close the socket channel
-		 */
-        public void silentlyClose() {
-            try {
-                socketChannel.close();
-            } catch (IOException e) {
-                // ignore exception
-            }
-        }
-
-		@Override
-		public void doRead() throws IOException {
-			if (socketChannel.read(pairedContext.get().bbout) == -1) {
-				closed = true;
-				return;
-			}
-			updateInterests();
-		}
-
-		@Override
-		public void doWrite() throws IOException {
-			bbout.flip();
-			if (socketChannel.write(bbout) == -1) {
-				closed = true;
-				return;
-			}
-			bbout.compact();
-			updateInterests();
-		}
-	}
-	
+	/*-----------------------TCP RELATED PART------------------------*/
 	/**
 	 * 
 	 * Class representing a TCP protocole message.
@@ -137,7 +38,7 @@ public class ChatOsServer {
 		private final String sender;
 		private final String recipient;
 		private final short  password;
-		
+
 		/**
 		 * TCPKey constructor
 		 * @param sender the pseudonym of the sender client
@@ -151,7 +52,7 @@ public class ChatOsServer {
 			this.recipient = recipient;
 			this.password = password;
 		}
-		
+
 		@Override
 		public boolean equals(Object obj) {
 			if (!(obj instanceof TCPKey)){
@@ -162,13 +63,13 @@ public class ChatOsServer {
 					&& sender.equals(tcpKey.sender)
 					&& recipient.equals(tcpKey.recipient);
 		}
-		
+
 		@Override
 		public int hashCode() {
 			return sender.hashCode()^recipient.hashCode()+password;
 		}
 	}
-	
+
 	/**
 	 * 
 	 * Class representing and ongoing TCP connection protocol waiting for both sides to connect
@@ -176,7 +77,7 @@ public class ChatOsServer {
 	private class TCPLink {
 		private Optional<TCPContext> senderContext    = Optional.empty();
 		private Optional<TCPContext> recipientContext = Optional.empty();
-		
+
 		/**
 		 * 
 		 * @brief check if a the both client in a TCP private connexion are present
@@ -185,7 +86,7 @@ public class ChatOsServer {
 		public boolean bothConnected(){
 			return senderContext.isPresent() && recipientContext.isPresent();
 		}
-		
+
 		/**
 		 * 
 		 * @brief connect the sender to this context
@@ -197,12 +98,11 @@ public class ChatOsServer {
 			if (senderContext.isPresent()) {
 				return false;
 			}
-			var context = new TCPContext(key, sc);
+			var context = new TCPContext(key, sc,new ErrorCode(ErrorCode.OK).toByteBuffer(logger).get());
 			senderContext = Optional.of(context);
-			context.bbout.put((new ErrorCode(ErrorCode.OK)).toByteBuffer(logger).get());
 			return true;
 		}
-		
+
 		/**
 		 * 
 		 * @brief connect the recipient to this context
@@ -214,12 +114,11 @@ public class ChatOsServer {
 			if (recipientContext.isPresent()) {
 				return false;
 			}
-			var context = new TCPContext(key, sc);
+			var context = new TCPContext(key, sc, new ErrorCode(ErrorCode.OK).toByteBuffer(logger).get());
 			recipientContext = Optional.of(context);
-			context.bbout.put((new ErrorCode(ErrorCode.OK)).toByteBuffer(logger).get());
 			return true;
 		}
-		
+
 		/**
 		 * 
 		 * @brief close the sender & the recipient sockets channels
@@ -228,7 +127,7 @@ public class ChatOsServer {
 			senderContext.ifPresent((c) -> c.silentlyClose());
 			recipientContext.ifPresent((c) -> c.silentlyClose());
 		}
-		
+
 		/**
 		 * 
 		 * @brief connect sender and recipient each other
@@ -239,14 +138,11 @@ public class ChatOsServer {
 			}
 			senderContext.get().setPairedContext(recipientContext.get());
 			recipientContext.get().setPairedContext(senderContext.get());
-			senderContext.get().updateInterestOps();
-			recipientContext.get().updateInterestOps();
 		}
 	}
-	
-	
+
 	private final HashMap<TCPKey, TCPLink> waitingTCPConnections = new HashMap<>();
-	
+
     /**
      * @brief Add a new pair TCPKey/TCPLink to the map if possible
      * @param message the message to send
@@ -268,7 +164,7 @@ public class ChatOsServer {
 		clientLoginMap.get(message.getRecipient()).queueFrame(message);
     	return ErrorCode.OK;
 	}
-    
+
     /**
      * @brief Remove the pair TCPKey/TCPLink if it exists.
      * @param message the message to convey
@@ -289,7 +185,7 @@ public class ChatOsServer {
     	clientLoginMap.get(message.getSender()).queueFrame(message);
     	return ErrorCode.OK;
     }
-    
+
     /**
      * 
      * @brief accept the connexion of a TCP private connexion if possible
@@ -314,7 +210,7 @@ public class ChatOsServer {
     	}
     	return ErrorCode.OK;
     }
-    
+
     /**
      * @brief broadcast a message (TCPAccept) to the context
      * @param message the message TCPAccept
@@ -330,7 +226,7 @@ public class ChatOsServer {
         	link.connectRecipientContext(key, sc);
     	});
     }
-    
+
     /**
      * 
      * @brief broadcast a message (TCPConnect) to the context
@@ -348,21 +244,18 @@ public class ChatOsServer {
     	});
     }
 	/*-----------------------END OF TCP RELATED PART------------------------*/
-	
-	
-    static private int BUFFER_SIZE = 1_024;
     static private Logger logger = Logger.getLogger(ChatOsServer.class.getName());
 
     private final HashMap<String, ChatContext> clientLoginMap = new HashMap<>();
     private final ServerSocketChannel serverSocketChannel;
     private final Selector selector;
-	
+
     public ChatOsServer(int port) throws IOException {
         serverSocketChannel = ServerSocketChannel.open();
         serverSocketChannel.bind(new InetSocketAddress(port));
         selector = Selector.open();
     }
-    
+
     /**
      * @brief Return whether or not the pseudo is available
      * @param pseudo the pseudonym to check
@@ -371,7 +264,7 @@ public class ChatOsServer {
     public boolean isAvailable(String pseudo) {
     	return !clientLoginMap.containsKey(pseudo);
     }
-    
+
     /**
      * @brief Link the new created context to the pseudonym
      * 
@@ -398,7 +291,7 @@ public class ChatOsServer {
     	clientLoginMap.put(pseudo, context);
     	return true;
     }
-    
+
     /**
      * 
      * @brief Broadcast a private message to the correct recipient if it exist
@@ -417,6 +310,7 @@ public class ChatOsServer {
     		return ErrorCode.OK;
     	}
     }
+
     /**
      * 
      * @brief Broadcast a message to every person connected with the exception of the sender
@@ -433,7 +327,7 @@ public class ChatOsServer {
     		}
     	}
     }
-    
+
     /**
      * 
      * @brief launch the server
@@ -451,7 +345,7 @@ public class ChatOsServer {
 			}
 		}
     }
-    
+
     /**
      * 
      * @brief treat server key
@@ -483,7 +377,7 @@ public class ChatOsServer {
 			}
 		}
 	}
-    
+
     /**
      * 
      * @brief attach a new ChatContext to a key
@@ -500,7 +394,7 @@ public class ChatOsServer {
 		var newKey = sc.register(selector, SelectionKey.OP_READ);
 		newKey.attach(new WaitingContext(this,newKey));
     }
-    
+
     /**
      * 
      * @brief silently close the socket channel
@@ -515,7 +409,7 @@ public class ChatOsServer {
             // ignore exception
         }
     }
-	
+
     /**
      * 
      * @brief main method starting a ChatOs server
@@ -538,9 +432,7 @@ public class ChatOsServer {
     private static void usage(){
         System.out.println("Usage : ChatOsServer port");
     }
-    
-    
-    
+
     /**
 	 * 
 	 * @brief get a string format of a key

@@ -156,6 +156,7 @@ class ChatContext implements Context {
         this.server = server;
         this.login = login;
         this.bbin.put(buffer);
+        key.attach(this);
     }
 
     /**

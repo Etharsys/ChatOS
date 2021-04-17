@@ -76,7 +76,7 @@ public class StringReader implements Reader<String> {
     @Override
     public void reset() {
         state= State.WAITING_INT;
-        internalbb.clear().limit(Integer.BYTES);
+        internalbb.clear();
         shortReader.reset();
     }
 }

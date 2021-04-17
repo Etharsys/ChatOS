@@ -11,17 +11,21 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import fr.upem.net.chatos.datagram.ConnectionRequest;
 import fr.upem.net.chatos.datagram.Datagram;
@@ -33,10 +37,12 @@ import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
 import fr.upem.net.chatos.datagram.TCPDatagram;
+import fr.upem.net.chatos.reader.HTTPReader;
 import fr.upem.net.chatos.reader.OpCodeReader;
 import fr.upem.net.chatos.reader.Reader.ProcessStatus;
+import fr.upem.net.chatos.reader.StringReader;
 
-public class ClientChatOs {
+public class ChatOsClient {
 	
 	private interface Context {
 		
@@ -65,7 +71,7 @@ public class ClientChatOs {
 		
 		private final SelectionKey  key;
 		private final SocketChannel sc;
-		private final ClientChatOs  client;
+		private final ChatOsClient  client;
 		
 		private final int BUFFER_MAX_SIZE = (MAX_STRING_SIZE + Short.BYTES) * 3 + 1;
 		
@@ -82,7 +88,7 @@ public class ClientChatOs {
 		 * ChatContext contructor
 		 * @param key the selected key to attach to this context (client)
 		 */
-		private ChatContext(SelectionKey key, ClientChatOs client) {
+		private ChatContext(SelectionKey key, ChatOsClient client) {
 			this.key = key;
 			this.sc  = (SocketChannel) key.channel();
 			this.client = client;
@@ -395,12 +401,19 @@ public class ClientChatOs {
 	
 	/* ----------------------------------------------------------------- */
 	
+	private enum Status {
+		WQ, //WAIT_QUESTION, // mode : read
+		WA, //WAIT_ANSWER,   // mode : read 
+		AN, //ANSWERING,     // mode : write
+		SQ, //SEND_QUESTION, // mode : write
+		RQ, //READ_QUESTION, // mode : read
+	};
 	
 	/**
 	 * 
 	 * Context of a TCP connection
 	 */
-	public class TCPContext implements Context{
+	private class TCPContext implements Context{
 		private final static int BUFFER_SIZE = 1_024;
 		private final Charset    ASCII       = StandardCharsets.US_ASCII;
 		
@@ -409,13 +422,23 @@ public class ClientChatOs {
 		
 		private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_SIZE);
 		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
-		
-		private Optional<OpCodeReader> reader = Optional.of(new OpCodeReader());
-		
+				
 		private final String recipient;
 		
 		private boolean closed;
 		
+		//private boolean waitingData   = true;
+		//private boolean waitingAnswer = false;
+		
+		private Status state = Status.WQ;
+		
+		private String       HTTPanswer  = "";
+		private List<String> fileLines   = List.of();
+		private ByteBuffer   currentLine = ByteBuffer.allocate(0); 
+		
+		private final HTTPReader   httpreader   = new HTTPReader();
+		private final StringReader stringReader = new StringReader();
+
 		/**
 		 * TCPContext constructor (TCP private connexion)
 		 * @param key the original context key
@@ -431,48 +454,142 @@ public class ClientChatOs {
 			this.sc = sc;
 			this.recipient = recipient;
 		}
-		
+
 		/**
-		 * update the interestOps of the key
-		 * @brief
+		 * @brief update the interestOps of the key
 		 */
 		private void updateInterestOps() {
-        	int intOps = 0;
-        	if (!closed && bbin.hasRemaining() && !reader.isEmpty()) {
-        		intOps |= SelectionKey.OP_READ;
-        	}
-        	if (bbout.position() > 0 || !(TCPCommandMap.get(recipient).isEmpty())){
-        		intOps |= SelectionKey.OP_WRITE;
-        	}
-        	if (intOps == 0) {
-        		silentlyClose();
-        		return;
-        	}
-        	key.interestOps(intOps);
-        }
+			int intOps = 0;
+			if (!closed && bbin.hasRemaining() 
+					&& (state == Status.WQ || state == Status.WA || state == Status.RQ)) {
+				intOps |= SelectionKey.OP_READ;
+			}
+			if (bbout.position() > 0 || !(TCPCommandMap.get(recipient).isEmpty()) 
+					|| (state == Status.SQ || state == Status.AN)){
+				intOps |= SelectionKey.OP_WRITE;
+			}
+			if (intOps == 0) {
+				silentlyClose();
+				return;
+			}
+			key.interestOps(intOps);
+		}		
 		
 		/**
-		 * @brief add a command to the commands queue
-		 * @param bb the command to add
+		 * @throws IOException 
+		 * @brief process the command of bbin
 		 */
-		private void processIn() {
-			bbin.flip();
-			System.out.println("From the TCP connection : " + ASCII.decode(bbin));
-			bbin.clear();
+		private void processIn() throws IOException {
+			logger.info("In " + state);
+			switch (state) {
+			case WQ :
+				state = Status.RQ;
+			case RQ : // HTTP answer (2)
+				processInRequest();
+				break;
+			case SQ :
+				state = Status.WA;
+			case WA : // HTTP GET result (4)
+				processInAnswer();
+				break;
+			case AN :
+				state = Status.WQ;
+			}
+		}
+		
+		private void processInRequest() throws IOException {
+			var ps = stringReader.process(bbin);
+			switch (ps) {
+			case ERROR : 
+				logger.log(Level.SEVERE, "HTTP Reader get ERROR status");
+				silentlyClose();
+				return;
+			case REFILL :
+				return;
+			case DONE :
+				HTTPanswer = stringReader.get(); // TODO file !
+				stringReader.reset();
+				System.out.println(HTTPanswer);
+				
+				fileLines = Files.readAllLines(Path.of(HTTPanswer), ASCII);
+				var length = fileLines.stream().collect(Collectors.summingInt(s -> s.length())) + fileLines.size();
+				currentLine = ASCII.encode(
+						  "HTTP/1.0 200 OK\r\n"
+						+ "Content-Type: text/html\r\n"
+						+ "Content-Length: " + length + "\r\n");
+				state = Status.AN;
+			}
+		}
+		
+		private void processInAnswer() {
+			var ps = httpreader.process(bbin);
+			switch (ps) {
+			case ERROR : 
+				logger.log(Level.SEVERE, "HTTP Reader get ERROR status");
+				silentlyClose();
+				break;
+			case REFILL :
+				break;
+			case DONE :
+				System.out.println("HTTP GET result from the TCP connexion : \n" + httpreader.get().getContent());
+				httpreader.reset();
+				state = Status.WQ;
+				break;
+			}
 		}
 
 		/**
 		 * @brief process the  content of bbout
 		 */
 		private void processOut() {
-			while (TCPCommandMap.get(recipient).size() != 0) {
+			logger.info("Out " + state);
+			switch (state) {
+			case WQ :
+				state = Status.SQ;
+			case SQ : // HTTP GET request (1)
+				processOutRequest();
+				break;
+			case RQ :
+				state = Status.AN;
+			case AN : // HTTP result (3)
+				processOutAnswer();
+				break;
+			case WA : //do nothing
+				break;
+			}
+		}
+		
+		private void processOutRequest() {
+			if (TCPCommandMap.get(recipient).size() != 0) {
 				var command = TCPCommandMap.get(recipient).peek();
 				var bb = ASCII.encode(command);
-				if (bbout.limit() >= bb.limit()) {
+				if (bbout.limit() >= bb.limit() + Short.BYTES) {
+					bbout.putShort((short) bb.limit());
 					bbout.put(bb);
 					TCPCommandMap.get(recipient).poll();
+					state = Status.WA;
+				}
+			}
+		}
+		
+		private void processOutAnswer() {
+			logger.info("current line : " + currentLine + ", " + fileLines.size());
+			while (currentLine.hasRemaining() && bbout.hasRemaining()) {
+				logger.info(fileLines.size() + ";");
+				if (currentLine.remaining() <= bbout.remaining()) {
+					bbout.put(currentLine);
 				} else {
-					break;
+					var tmp = currentLine.limit();
+					currentLine.limit(bbout.remaining());
+					bbout.put(currentLine);
+					currentLine.limit(tmp);					
+				}
+				if (!currentLine.hasRemaining() && fileLines.isEmpty()) {
+					state = Status.WQ;
+				} else {
+					var line = fileLines.remove(0);
+					logger.info(line + " : " + fileLines.size());
+					currentLine = ASCII.encode(line + "\n");
 				}
 			}
 		}
@@ -518,7 +635,7 @@ public class ClientChatOs {
 	/* ----------------------------------------------------------------- */
 	
 	static private int       MAX_STRING_SIZE = 1_024;
-	static private Logger    logger          = Logger.getLogger(ClientChatOs.class.getName());
+	static private Logger    logger          = Logger.getLogger(ChatOsClient.class.getName());
 	static private final int maxLoginLength  = 32;
 	
 	private final Thread                     console;
@@ -547,7 +664,7 @@ public class ClientChatOs {
 	 * @param serverAddress the server address
 	 * @throws IOException when open(s) methods throws it
 	 */
-	public ClientChatOs(String login, InetSocketAddress serverAddress) throws IOException {
+	public ChatOsClient(String login, InetSocketAddress serverAddress) throws IOException {
 		this.serverAddress = serverAddress;
 		this.login         = login;
 		this.sc            = SocketChannel.open();
@@ -756,7 +873,7 @@ public class ClientChatOs {
 			return;
 		}
 		var isa = new InetSocketAddress(args[1], Integer.parseInt(args[2]));
-		new ClientChatOs(args[0], isa).launch();
+		new ChatOsClient(args[0], isa).launch();
 	}
 	
 	/**

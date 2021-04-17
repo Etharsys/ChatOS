@@ -70,36 +70,6 @@ class ChatContext implements Context {
     		Objects.requireNonNull(context);
     		logger.info("Received ErrorCode");
     		//Do nothing
-//    		System.out.println("Received an Error from the server : ");
-//    		switch(reader.get().getErrorCode()) {
-//    		case ErrorCode.ALREADY_CONNECTED:
-//    			System.out.println("ALREADY_CONNECTED");
-//    			break;
-//    		case ErrorCode.INVALID_PSEUDONYM:
-//    			System.out.println("INVALID_PSEUDONYM");
-//    			break;
-//    		case ErrorCode.NOT_CONNECTED:
-//    			System.out.println("NOT_CONNECTED");
-//    			break;
-//    		case ErrorCode.OK:
-//    			System.out.println("OK");
-//    			break;
-//    		case ErrorCode.PSEUDO_UNAVAILABLE:
-//    			System.out.println("PSEUDO_UNAVAILABLE");
-//    			break;
-//    		case ErrorCode.TCP_IN_PROTOCOLE:
-//    			System.out.println("TCP_IN_PROTOCOLE");
-//    			break;
-//    		case ErrorCode.TCP_NOT_IN_PROTOCOLE:
-//    			System.out.println("TCP_NOT_IN_PROTOCOLE");
-//    			break;
-//    		case ErrorCode.UNREACHABLE_USER:
-//    			System.out.println("UNREACHABLE_USER");
-//    			break;
-//    		default:
-//    			System.out.println("UNKNOWN");
-//    			break;
-//    		}
     	}
 
     	@Override

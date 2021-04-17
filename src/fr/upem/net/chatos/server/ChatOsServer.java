@@ -183,6 +183,7 @@ public class ChatOsServer {
     		return ErrorCode.UNREACHABLE_USER;
     	}
     	clientLoginMap.get(message.getSender()).queueFrame(message);
+    	clientLoginMap.get(message.getRecipient()).queueFrame(message);
     	return ErrorCode.OK;
     }
 

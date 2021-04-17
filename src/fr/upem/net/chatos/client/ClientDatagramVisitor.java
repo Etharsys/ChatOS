@@ -12,10 +12,10 @@ import fr.upem.net.chatos.reader.TCPAbortReader;
 import fr.upem.net.chatos.reader.TCPAcceptReader;
 import fr.upem.net.chatos.reader.TCPAskReader;
 import fr.upem.net.chatos.reader.TCPConnectReader;
-import fr.upem.net.chatos.client.ClientChatOs.ChatContext;
+import fr.upem.net.chatos.client.ChatOsClient.ChatContext;
 import fr.upem.net.chatos.datagram.TCPAbort;
 
-public class ClientDatagramVisitor implements DatagramVisitor<ClientChatOs.ChatContext>{
+public class ClientDatagramVisitor implements DatagramVisitor<ChatOsClient.ChatContext>{
 
 	@Override
 	public void visit(ConnectionRequestReader reader, ChatContext context) {

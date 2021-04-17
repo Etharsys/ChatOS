@@ -175,10 +175,10 @@
 	  	      <attribute name="Main-Class" value="fr.upem.net.chatos.server.ChatOsServer"/>
 	  	   </manifest>
 	  	</jar>
-  		<jar destfile="${jar.dir}/ClientChatOs.jar"
+  		<jar destfile="${jar.dir}/ChatOsClient.jar"
   			  	   basedir="${build.dir}">
 		  	   <manifest>
-		  	      <attribute name="Main-Class" value="fr.upem.net.chatos.server.ClientChatOs"/>
+		  	      <attribute name="Main-Class" value="fr.upem.net.chatos.client.ChatOsClient"/>
 		  	   </manifest>
 	  	</jar>
   	</target>

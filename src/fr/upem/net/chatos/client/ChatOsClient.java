@@ -9,23 +9,16 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 import fr.upem.net.chatos.datagram.ConnectionRequest;
 import fr.upem.net.chatos.datagram.Datagram;
@@ -37,14 +30,11 @@ import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
 import fr.upem.net.chatos.datagram.TCPDatagram;
-import fr.upem.net.chatos.reader.HTTPReader;
 import fr.upem.net.chatos.reader.OpCodeReader;
-import fr.upem.net.chatos.reader.Reader.ProcessStatus;
-import fr.upem.net.chatos.reader.StringReader;
 
 public class ChatOsClient {
 	
-	private interface Context {
+	public interface Context {
 		
 		/**
 		 * @brief read from the socket channel (bbin should be in write mode before and after)
@@ -64,167 +54,6 @@ public class ChatOsClient {
 		 */
 		void doConnect() throws IOException;
 	}
-	
-	/* ----------------------------------------------------------------- */
-	
-	public class ChatContext implements Context{
-		
-		private final SelectionKey  key;
-		private final SocketChannel sc;
-		private final ChatOsClient  client;
-		
-		private final int BUFFER_MAX_SIZE = (MAX_STRING_SIZE + Short.BYTES) * 3 + 1;
-		
-		private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_MAX_SIZE);
-		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_MAX_SIZE);
-		
-		private final Queue<Datagram>       queue   = new LinkedList<>();
-		private final OpCodeReader          reader  = new OpCodeReader();
-		private final ClientDatagramVisitor visitor = new ClientDatagramVisitor();
-		
-		private boolean closed = false;
-		
-		/**
-		 * ChatContext contructor
-		 * @param key the selected key to attach to this context (client)
-		 */
-		private ChatContext(SelectionKey key, ChatOsClient client) {
-			this.key = key;
-			this.sc  = (SocketChannel) key.channel();
-			this.client = client;
-		}
-		
-		/**
-		 * @brief process the content of bbin
-		 */
-		private void processIn() {
-			for (var ps = reader.process(bbin); ps != ProcessStatus.REFILL; ps = reader.process(bbin)) {
-				if (ps == ProcessStatus.ERROR) {
-					silentlyClose();
-					return;
-				} else {
-					reader.accept(visitor, this);
-					reader.reset();
-				}
-			}
-		}
-		
-		/**
-		 * @brief add a command to the commands queue
-		 * @param datagram the command to add
-		 */
-		private void queueCommand(Datagram datagram) {
-			queue.add(datagram);
-			processOut();
-			updateInterestOps();
-		}
-		
-		/**
-		 * @brief process the  content of bbout
-		 */
-		private void processOut() {
-			while (!queue.isEmpty()) {
-				var datagram = queue.peek();
-				var optBB = datagram.toByteBuffer(logger);
-				if (optBB.isEmpty()) {
-					queue.remove();
-				}
-				var bb = optBB.get();
-				if (bb.remaining() <= bbout.remaining()) {
-					queue.remove();
-					bbout.put(bb);
-				} else {
-					break;
-				}
-			}
-		}
-		
-		/**
-		 * @brief update the interestOps of the key
-		 */
-		private void updateInterestOps() {
-			var interesOps=0;
-            if (!closed && bbin.hasRemaining()){
-                interesOps|=SelectionKey.OP_READ;
-            }
-            if (bbout.position()!=0){
-                interesOps|=SelectionKey.OP_WRITE;
-            }
-            if (interesOps==0){
-                silentlyClose();
-                return;
-            }
-            key.interestOps(interesOps);
-		}
-		
-		/**
-		 * @brief silently close the socket channel
-		 */
-		private void silentlyClose() {
-			try {
-				sc.close();
-			} catch (IOException ioe) {
-				//ignore exception
-			}
-		}
-		
-		@Override
-		public void doRead() throws IOException {
-			System.out.println("Reading...");
-			if (sc.read(bbin) == -1) {
-				closed = true;
-			}
-			processIn();
-			updateInterestOps();
-		}
-
-		@Override
-		public void doWrite() throws IOException {
-			bbout.flip();
-			sc.write(bbout);
-			bbout.compact();
-			processOut();
-			updateInterestOps();
-		}
-
-		@Override
-		public void doConnect() throws IOException {
-			//Impossible
-			key.interestOps(SelectionKey.OP_READ);
-		}
-		
-		/**
-		 * 
-		 * @brief treat the specific request TCPAsk
-		 * @param tcpAsk the datagram which represent the request
-		 */
-		public void treatTCPAsk(TCPAsk tcpAsk){
-			Objects.requireNonNull(tcpAsk);
-			client.treatTCPAsk(tcpAsk);
-		}
-		
-		/**
-		 * 
-		 * @brief treat the specific request TCPAccept
-		 * @param tcpAccept the datagram which represent the request
-		 */
-		public void treatTCPAccept(TCPAccept tcpAccept) {
-			Objects.requireNonNull(tcpAccept);
-			client.treatTCPAccept(tcpAccept);
-		}
-		
-		/**
-		 * 
-		 * @brief treat the specific request TCPAbort
-		 * @param tcpAbort the datagram which represent the request
-		 */
-		public void treatTCPAbort(TCPAbort tcpAbort) {
-			Objects.requireNonNull(tcpAbort);
-			client.treatTCPAbort(tcpAbort);
-		}
-	}
-	
-	/* ----------------------------------------------------------------- */
 
 	/**
 	 * 
@@ -244,7 +73,7 @@ public class ChatOsClient {
 			socket.configureBlocking(false);
 			socket.connect(serverAddress);
 			var newKey = socket.register(selector, SelectionKey.OP_CONNECT);
-			newKey.attach(new TCPContextWaiter(newKey, socket, recipient, supplier.get().toByteBuffer(logger).get()));
+			newKey.attach(new TCPContextWaiter(newKey, socket, recipient, supplier.get().toByteBuffer(logger).get(),this));
 		} catch(IOException e) {
 			//Aborting connection
 			chatContext.queueCommand(new TCPAbort(request.getSender(), request.getRecipient(), request.getPassword()));
@@ -293,6 +122,7 @@ public class ChatOsClient {
 
 	public class TCPContextWaiter implements Context{
 		private final String recipient;
+		private final ChatOsClient client;
 		
 		private final SelectionKey contextKey;
 		private final SocketChannel socket;
@@ -308,13 +138,15 @@ public class ChatOsClient {
 		 * @param recipient the pseudonym of the TCP private connexion recipient
 		 * @param buffer the buffer of the TCPDatagram request
 		 */
-		public TCPContextWaiter(SelectionKey contextKey, SocketChannel socket, String recipient, ByteBuffer buffer) {
+		public TCPContextWaiter(SelectionKey contextKey, SocketChannel socket, String recipient, ByteBuffer buffer,ChatOsClient client) {
 			Objects.requireNonNull(contextKey);
 			Objects.requireNonNull(socket);
 			Objects.requireNonNull(recipient);
+			Objects.requireNonNull(client);
 			this.contextKey = contextKey;
 			this.socket = socket;
 			this.recipient = recipient;
+			this.client = client;
 			bbout = buffer;
 		}
 		
@@ -349,7 +181,7 @@ public class ChatOsClient {
 				if (err.getErrorCode() != ErrorCode.OK) {
 					closed = true;
 				} else {
-					var context = new TCPContext(contextKey,socket,recipient);
+					var context = new TCPContext(contextKey,socket,recipient,client);
 					contextKey.attach(context);
 					context.updateInterestOps();
 					TCPContextMap.put(recipient, context);
@@ -398,243 +230,7 @@ public class ChatOsClient {
 		}
 	}
 	
-	
 	/* ----------------------------------------------------------------- */
-	
-	private enum Status {
-		WQ, //WAIT_QUESTION, // mode : read
-		WA, //WAIT_ANSWER,   // mode : read 
-		AN, //ANSWERING,     // mode : write
-		SQ, //SEND_QUESTION, // mode : write
-		RQ, //READ_QUESTION, // mode : read
-	};
-	
-	/**
-	 * 
-	 * Context of a TCP connection
-	 */
-	private class TCPContext implements Context{
-		private final static int BUFFER_SIZE = 1_024;
-		private final Charset    ASCII       = StandardCharsets.US_ASCII;
-		
-		private final SelectionKey key;
-		private final SocketChannel sc;
-		
-		private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_SIZE);
-		private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
-				
-		private final String recipient;
-		
-		private boolean closed;
-		
-		//private boolean waitingData   = true;
-		//private boolean waitingAnswer = false;
-		
-		private Status state = Status.WQ;
-		
-		private String       HTTPanswer  = "";
-		private List<String> fileLines   = List.of();
-		private ByteBuffer   currentLine = ByteBuffer.allocate(0); 
-		
-		private final HTTPReader   httpreader   = new HTTPReader();
-		private final StringReader stringReader = new StringReader();
-
-		/**
-		 * TCPContext constructor (TCP private connexion)
-		 * @param key the original context key
-		 * @param socket the original socket channel
-		 * @param recipient the pseudonym of the TCP private connexion recipient
-		 */
-		public TCPContext(SelectionKey key, SocketChannel sc, String recipient) {
-			logger.severe("Created TCP Context");
-			Objects.requireNonNull(key);
-			Objects.requireNonNull(sc);
-			Objects.requireNonNull(recipient);
-			this.key = key;
-			this.sc = sc;
-			this.recipient = recipient;
-		}
-
-		/**
-		 * @brief update the interestOps of the key
-		 */
-		private void updateInterestOps() {
-			int intOps = 0;
-			if (!closed && bbin.hasRemaining() 
-					&& (state == Status.WQ || state == Status.WA || state == Status.RQ)) {
-				intOps |= SelectionKey.OP_READ;
-			}
-			if (bbout.position() > 0 || !(TCPCommandMap.get(recipient).isEmpty()) 
-					|| (state == Status.SQ || state == Status.AN)){
-				intOps |= SelectionKey.OP_WRITE;
-			}
-			if (intOps == 0) {
-				silentlyClose();
-				return;
-			}
-			key.interestOps(intOps);
-		}		
-		
-		/**
-		 * @throws IOException 
-		 * @brief process the command of bbin
-		 */
-		private void processIn() throws IOException {
-			logger.info("In " + state);
-			switch (state) {
-			case WQ :
-				state = Status.RQ;
-			case RQ : // HTTP answer (2)
-				processInRequest();
-				break;
-			case SQ :
-				state = Status.WA;
-			case WA : // HTTP GET result (4)
-				processInAnswer();
-				break;
-			case AN :
-				state = Status.WQ;
-			}
-		}
-		
-		private void processInRequest() throws IOException {
-			var ps = stringReader.process(bbin);
-			switch (ps) {
-			case ERROR : 
-				logger.log(Level.SEVERE, "HTTP Reader get ERROR status");
-				silentlyClose();
-				return;
-			case REFILL :
-				return;
-			case DONE :
-				HTTPanswer = stringReader.get(); // TODO file !
-				stringReader.reset();
-				System.out.println(HTTPanswer);
-				
-				fileLines = Files.readAllLines(Path.of(HTTPanswer), ASCII);
-				var length = fileLines.stream().collect(Collectors.summingInt(s -> s.length())) + fileLines.size();
-				currentLine = ASCII.encode(
-						  "HTTP/1.0 200 OK\r\n"
-						+ "Content-Type: text/html\r\n"
-						+ "Content-Length: " + length + "\r\n");
-				state = Status.AN;
-			}
-		}
-		
-		private void processInAnswer() {
-			var ps = httpreader.process(bbin);
-			switch (ps) {
-			case ERROR : 
-				logger.log(Level.SEVERE, "HTTP Reader get ERROR status");
-				silentlyClose();
-				break;
-			case REFILL :
-				break;
-			case DONE :
-				System.out.println("HTTP GET result from the TCP connexion : \n" + httpreader.get().getContent());
-				httpreader.reset();
-				state = Status.WQ;
-				break;
-			}
-		}
-
-		/**
-		 * @brief process the  content of bbout
-		 */
-		private void processOut() {
-			logger.info("Out " + state);
-			switch (state) {
-			case WQ :
-				state = Status.SQ;
-			case SQ : // HTTP GET request (1)
-				processOutRequest();
-				break;
-			case RQ :
-				state = Status.AN;
-			case AN : // HTTP result (3)
-				processOutAnswer();
-				break;
-			case WA : //do nothing
-				break;
-			}
-		}
-		
-		private void processOutRequest() {
-			if (TCPCommandMap.get(recipient).size() != 0) {
-				var command = TCPCommandMap.get(recipient).peek();
-				var bb = ASCII.encode(command);
-				if (bbout.limit() >= bb.limit() + Short.BYTES) {
-					bbout.putShort((short) bb.limit());
-					bbout.put(bb);
-					TCPCommandMap.get(recipient).poll();
-					state = Status.WA;
-				}
-			}
-		}
-		
-		private void processOutAnswer() {
-			logger.info("current line : " + currentLine + ", " + fileLines.size());
-			while (currentLine.hasRemaining() && bbout.hasRemaining()) {
-				logger.info(fileLines.size() + ";");
-				if (currentLine.remaining() <= bbout.remaining()) {
-					bbout.put(currentLine);
-				} else {
-					var tmp = currentLine.limit();
-					currentLine.limit(bbout.remaining());
-					bbout.put(currentLine);
-					currentLine.limit(tmp);					
-				}
-				if (!currentLine.hasRemaining() && fileLines.isEmpty()) {
-					state = Status.WQ;
-				} else {
-					var line = fileLines.remove(0);
-					logger.info(line + " : " + fileLines.size());
-					currentLine = ASCII.encode(line + "\n");
-				}
-			}
-		}
-		
-		/**
-		 * @brief silently close the socket channel
-		 */
-		private void silentlyClose() {
-            try {
-                sc.close();
-            } catch (IOException e) {
-                // ignore exception
-            }
-        }
-		
-		@Override
-		public void doRead() throws IOException {
-			if (sc.read(bbin) == -1) {
-        		closed = true;
-        	}
-			processIn();
-			updateInterestOps();
-		}
-
-		@Override
-		public void doWrite() throws IOException {
-			processOut();
-			bbout.flip();
-			if (sc.write(bbout) == -1) {
-				closed = true;
-				return;
-			}
-			bbout.compact();
-			updateInterestOps();
-		}
-
-		@Override
-		public void doConnect() throws IOException {
-			throw new AssertionError();
-		}
-	}
-	
-	/* ----------------------------------------------------------------- */
-	
-	static private int       MAX_STRING_SIZE = 1_024;
 	static private Logger    logger          = Logger.getLogger(ChatOsClient.class.getName());
 	static private final int maxLoginLength  = 32;
 	
@@ -671,6 +267,15 @@ public class ChatOsClient {
 		this.selector      = Selector.open();
 		this.commandQueue  = new ArrayBlockingQueue<>(maxCommands);
 		this.console       = new Thread(this::consoleRun);
+	}
+	
+	/**
+	 * 
+	 * @param recipient the login of the recipient
+	 * @return the queue corresponding to the recipient
+	 */
+	public Queue<String> getTCPCommandQueue(String recipient) {
+		return TCPCommandMap.get(recipient);
 	}
 	
 	/**

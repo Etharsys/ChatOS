@@ -13,6 +13,8 @@ public class ErrorCode implements Datagram {
 	static public final byte UNREACHABLE_USER     = 4;
 	static public final byte TCP_IN_PROTOCOLE     = 5;
 	static public final byte TCP_NOT_IN_PROTOCOLE = 6;
+	static public final byte NOT_CONNECTED		  = 7;
+	static public final byte ALREADY_CONNECTED    = 8;
 	private       final byte errorCode;
 	
 	/**

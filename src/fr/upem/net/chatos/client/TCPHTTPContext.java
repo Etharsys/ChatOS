@@ -7,6 +7,7 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.LinkedList;
@@ -43,14 +44,23 @@ class TCPHTTPContext implements TCPContext{
 	private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_SIZE);
 	private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
 	
+	private class CommandPair {
+		private final String command;
+		private final String target;
+		
+		public CommandPair(String command, String target) {
+			this.command = command;
+			this.target  = target;
+		}
+	}
+	
 	private final Queue<String> commandQueue = new LinkedList<>();
 	
 	private boolean closed;
 	
-	//private boolean waitingData   = true;
-	//private boolean waitingAnswer = false;
-	
 	private Status state = Status.WQ;
+	
+	private String targetFileName = "";
 	
 	private String       HTTPanswer  = "";
 	private List<String> fileLines   = List.of();
@@ -132,12 +142,19 @@ class TCPHTTPContext implements TCPContext{
 			stringReader.reset();
 			System.out.println(HTTPanswer);
 			
-			fileLines = Files.readAllLines(Path.of(HTTPanswer), ASCII);
-			var length = fileLines.stream().collect(Collectors.summingInt(s -> s.length())) + fileLines.size();
-			currentLine = ASCII.encode(
-					  "HTTP/1.0 200 OK\r\n"
-					+ "Content-Type: text/html\r\n"
-					+ "Content-Length: " + length + "\r\n");
+			try {				
+				fileLines = Files.readAllLines(Path.of(HTTPanswer), ASCII);
+				var length = fileLines.stream().collect(Collectors.summingInt(s -> s.length())) + fileLines.size();
+				currentLine = ASCII.encode(
+						"HTTP/1.0 200 OK\r\n"
+								+ "Content-Type: text/html\r\n"
+								+ "Content-Length: " + length + "\r\n");
+			} catch (NoSuchFileException nsfe) {
+				currentLine = ASCII.encode(
+						"HTTP/1.0 404 NotFound\r\n"
+								+ "Content-Type: text/html\r\n"
+								+ "Content-Length: 0\r\n");
+			}
 			state = Status.AN;
 		}
 	}
@@ -152,7 +169,11 @@ class TCPHTTPContext implements TCPContext{
 		case REFILL :
 			break;
 		case DONE :
-			System.out.println("HTTP GET result from the TCP connexion : \n" + httpreader.get().getContent());
+			if (httpreader.get().getHeader().getResponce_code().equals("200 OK")) {				
+				System.out.println("HTTP GET result from the TCP connexion : \n" + httpreader.get().getContent());
+			} else {
+				System.out.println("The requested file cannot be found, get ERROR 404 NotFound");
+			}
 			httpreader.reset();
 			state = Status.WQ;
 			break;

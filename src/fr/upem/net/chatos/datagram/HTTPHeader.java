@@ -10,7 +10,7 @@ public class HTTPHeader {
 		if (!version.equals("HTTP/1.0")) {
 			throw new IllegalArgumentException("HTTP version is not supported, " + version + " != HTTP/1.0");
 		}
-		if (!responce_code.equals("200 OK") && !responce_code.equals("404 Not Found")) {
+		if (!responce_code.equals("200 OK") && !responce_code.equals("404 NotFound")) {
 			throw new IllegalArgumentException("Error not supported");
 		}
 		if (!content_type.equals("text/html") && !content_type.equals("pdf/html")) {

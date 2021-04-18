@@ -17,7 +17,7 @@ public class HTTPHeaderReader implements Reader<HTTPHeader> {
 	private State state = State.WAITING_HEAD;
 	
 	private String version;
-	private String responce_code; // 200 OK | 404 ERROR
+	private String responce_code; // 200 OK | 404 NotFound
 	private String content_type;
 	private int    content_length;
 	

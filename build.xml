@@ -3,7 +3,7 @@
               Any modifications will be overwritten.
               To include a user specific buildfile here, simply create one in the same
               directory with the processing instruction <?eclipse.ant.import?>
-              as the first entry and export the buildfile again. --><project basedir="." default="build" name="ChatOS">
+              as the first entry and export the buildfile again. --><project basedir="." default="all" name="ChatOS">
     <property environment="env"/>
     <property name="junit.output.dir" value="junit"/>
     <property name="debuglevel" value="source,lines,vars"/>
@@ -158,16 +158,17 @@
     <property name="jar.dir" value="jar"/>
 	<property name="doc.dir" value="doc/javadoc"/>
 	<property name="build.dir" value="bin"/>
-  
+    
+              	
+    <target name="all" depends="generate-javadoc,build-jar"/>
 	<target name = "generate-javadoc">
 		<mkdir dir="${doc.dir}"/>
 		<javadoc package="fr.upem.net.chatos.*" sourcepath="${src.dir}" destdir="${doc.dir}" version="true">
 			<classpath refid="javadoc.classpath"/>
 		</javadoc>
-		<echo>Javadoc ca marche pas</echo>
 	</target>
               	
-  	<target name="build-jar">
+  	<target name="build-jar" depends="build">
   		<mkdir dir="${jar.dir}"/>
 	  	<jar destfile="${jar.dir}/ChatOsServer.jar"
 	  	   basedir="${build.dir}">

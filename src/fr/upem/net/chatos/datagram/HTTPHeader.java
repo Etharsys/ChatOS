@@ -13,7 +13,7 @@ public class HTTPHeader {
 		if (!responce_code.equals("200 OK") && !responce_code.equals("404 NotFound")) {
 			throw new IllegalArgumentException("Error not supported");
 		}
-		if (!content_type.equals("text/html") && !content_type.equals("pdf/html")) {
+		if (!content_type.equals("text") && !content_type.equals("unknown")) {
 			throw new IllegalArgumentException("Content type not supported");
 		}
 		if (content_length < 0 || content_length > 1_024) {

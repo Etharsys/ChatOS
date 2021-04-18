@@ -33,27 +33,6 @@ import fr.upem.net.chatos.datagram.TCPDatagram;
 import fr.upem.net.chatos.reader.OpCodeReader;
 
 public class ChatOsClient {
-	
-	public interface Context {
-		
-		/**
-		 * @brief read from the socket channel (bbin should be in write mode before and after)
-		 * @throws IOException when read throws it
-		 */
-		void doRead()    throws IOException;
-		
-		/**
-		 * @brief write to the socket channel (bbout should be in write mode before and after)
-		 * @throws IOException when write throws it
-		 */
-		void doWrite()   throws IOException;
-		
-		/**
-		 * @brief proceed the socket channel connexion
-		 * @throws IOException when the keys updates throws it
-		 */
-		void doConnect() throws IOException;
-	}
 
 	/**
 	 * 
@@ -117,118 +96,6 @@ public class ChatOsClient {
 			}
 		}
 	}
-		
-	/* ----------------------------------------------------------------- */
-
-	public class TCPContextWaiter implements Context{
-		private final String recipient;
-		private final ChatOsClient client;
-		
-		private final SelectionKey contextKey;
-		private final SocketChannel socket;
-		private final ByteBuffer bbin = ByteBuffer.allocate(2);
-		private final ByteBuffer bbout;
-		
-		private boolean closed;
-		
-		/**
-		 * TCPContextWaiter constructor
-		 * @param contextKey the original context key
-		 * @param socket the original socket channel
-		 * @param recipient the pseudonym of the TCP private connexion recipient
-		 * @param buffer the buffer of the TCPDatagram request
-		 */
-		public TCPContextWaiter(SelectionKey contextKey, SocketChannel socket, String recipient, ByteBuffer buffer,ChatOsClient client) {
-			Objects.requireNonNull(contextKey);
-			Objects.requireNonNull(socket);
-			Objects.requireNonNull(recipient);
-			Objects.requireNonNull(client);
-			this.contextKey = contextKey;
-			this.socket = socket;
-			this.recipient = recipient;
-			this.client = client;
-			bbout = buffer;
-		}
-		
-		/**
-		 * update the interestOps of the key
-		 * @brief
-		 */
-		private void updateInterestOps() {
-        	if (closed) {
-        		silentlyClose();
-        		return;
-        	}
-        	if (bbout.hasRemaining()) {
-        		contextKey.interestOps(SelectionKey.OP_WRITE);
-        	} else {
-        		contextKey.interestOps(SelectionKey.OP_READ);
-        	}
-        }
-
-		/**
-		 * @brief add a command to the commands queue
-		 * @param bb the command to add
-		 */
-		private void processIn() {
-			if (!bbin.hasRemaining()) {
-				bbin.flip();
-				if (bbin.get() != OpCodeReader.ERROR_PACKET_CODE) {
-					System.out.println("Didn't receive ErrorCode");
-				}
-				var err = new ErrorCode(bbin.get());
-				System.out.println("Received " + err);
-				if (err.getErrorCode() != ErrorCode.OK) {
-					closed = true;
-				} else {
-					var context = new TCPContext(contextKey,socket,recipient,client);
-					contextKey.attach(context);
-					context.updateInterestOps();
-					TCPContextMap.put(recipient, context);
-					System.out.println("Connection TCP with " + recipient + " enabled");
-				}
-			}
-		}
-		
-		/**
-		 * @brief silently close the socket channel
-		 */
-		private void silentlyClose() {
-            try {
-                socket.close();
-            } catch (IOException e) {
-                // ignore exception
-            }
-        }
-		
-		@Override
-		public void doRead() throws IOException {
-			if (socket.read(bbin) == -1) {
-				closed = true;
-        		return;
-        	}
-			updateInterestOps();
-			processIn();
-		}
-
-		@Override
-		public void doConnect() throws IOException {
-        	if (!socket.finishConnect()) {
-        		return;
-        	}
-        	contextKey.interestOps(SelectionKey.OP_WRITE);
-        	printSelectedKey(contextKey);
-        }
-
-		@Override
-		public void doWrite() throws IOException {
-			if (socket.write(bbout) == -1) {
-				closed = true;
-				return;
-			}
-			updateInterestOps();
-		}
-	}
 	
 	/* ----------------------------------------------------------------- */
 	static private Logger    logger          = Logger.getLogger(ChatOsClient.class.getName());
@@ -276,6 +143,17 @@ public class ChatOsClient {
 	 */
 	public Queue<String> getTCPCommandQueue(String recipient) {
 		return TCPCommandMap.get(recipient);
+	}
+	
+	/**
+	 * Add the TCPContext to the context queue (erase the old one)
+	 * @param recipient the recipient linked to the context
+	 * @param context the context to put in the map
+	 */
+	public void putContextInContextQueue(String recipient, TCPContext context) {
+		Objects.requireNonNull(recipient);
+		Objects.requireNonNull(context);
+		TCPContextMap.put(recipient, context);
 	}
 	
 	/**

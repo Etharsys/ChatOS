@@ -14,7 +14,6 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
-import fr.upem.net.chatos.client.ChatOsClient.Context;
 import fr.upem.net.chatos.reader.HTTPReader;
 import fr.upem.net.chatos.reader.StringReader;
 

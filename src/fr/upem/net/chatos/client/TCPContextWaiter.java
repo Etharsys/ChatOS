@@ -11,7 +11,7 @@ import java.util.Queue;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.reader.OpCodeReader;
 
-class TCPContextWaiter implements TCPPContext{
+class TCPContextWaiter implements TCPContext{
 	private final String recipient;
 	private final ChatOsClient client;
 	
@@ -40,6 +40,10 @@ class TCPContextWaiter implements TCPPContext{
 		this.recipient = recipient;
 		this.client = client;
 		bbout = buffer;
+	}
+	
+	public void launch() {
+		contextKey.interestOps(SelectionKey.OP_CONNECT);
 	}
 	
 	/**
@@ -73,9 +77,8 @@ class TCPContextWaiter implements TCPPContext{
 			if (err.getErrorCode() != ErrorCode.OK) {
 				closed = true;
 			} else {
-				var context = new TCPContext(contextKey,socket,recipient,client);
+				var context = new TCPHTTPContext(contextKey,socket,commandQueue);
 				contextKey.attach(context);
-				context.updateInterestOps();
 				client.putContextInContextQueue(recipient, context);
 				System.out.println("Connection TCP with " + recipient + " enabled");
 			}

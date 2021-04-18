@@ -11,13 +11,11 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.Objects;
-import java.util.Queue;
+import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
-import java.util.function.Supplier;
 import java.util.logging.Logger;
 
 import fr.upem.net.chatos.datagram.ConnectionRequest;
@@ -33,32 +31,6 @@ import fr.upem.net.chatos.datagram.TCPDatagram;
 import fr.upem.net.chatos.reader.OpCodeReader;
 
 public class ChatOsClient {
-
-	/**
-	 * 
-	 * @brief proceed a private connexion TCP (connect packet handling)
-	 * @param request the datagram representing the TCP private connexion
-	 * @param recipient the pseudonym of the recipient client
-	 * @param supplier a potential copy of the datagram
-	 */
-	private void connectTCP(TCPDatagram request, String recipient, Supplier<TCPDatagram> supplier) {
-		if (TCPCommandMap.containsKey(request.getSender())) {
-			//Already Connected
-			chatContext.queueCommand(new TCPAbort(request.getSender(), request.getRecipient(), request.getPassword()));
-			return;
-		}
-		try {
-			var socket = SocketChannel.open();
-			socket.configureBlocking(false);
-			socket.connect(serverAddress);
-			var newKey = socket.register(selector, SelectionKey.OP_CONNECT);
-			newKey.attach(new TCPContextWaiter(newKey, socket, recipient, supplier.get().toByteBuffer(logger).get(),this));
-		} catch(IOException e) {
-			//Aborting connection
-			chatContext.queueCommand(new TCPAbort(request.getSender(), request.getRecipient(), request.getPassword()));
-		}
-	}
-	
 	/**
 	 * 
 	 * @brief treat the TCPAsk request
@@ -66,8 +38,20 @@ public class ChatOsClient {
 	 */
 	public void treatTCPAsk(TCPAsk tcpAsk){
 		Objects.requireNonNull(tcpAsk);
-		connectTCP(tcpAsk, tcpAsk.getSender(), () -> new TCPAccept(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()));
-		TCPCommandMap.put(tcpAsk.getSender(), new LinkedList<>());
+		//Always yes
+		try {
+			var socket = SocketChannel.open();
+			socket.configureBlocking(false);
+			socket.connect(serverAddress);
+			var newKey = socket.register(selector, SelectionKey.OP_READ);
+			var context = new TCPContextWaiter(newKey, socket, tcpAsk.getSender(),  new TCPAccept(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()).toByteBuffer(logger).get(),this);
+			context.launch();
+			newKey.attach(context);
+			TCPContextMap.put(tcpAsk.getSender(), context);
+		} catch(IOException e) {
+			//Aborting connection
+			chatContext.queueCommand(new TCPAbort(tcpAsk.getSender(), tcpAsk.getRecipient(), tcpAsk.getPassword()));
+		}
 	}
 	
 	/**
@@ -77,7 +61,12 @@ public class ChatOsClient {
 	 */
 	public void treatTCPAccept(TCPAccept tcpAccept) {
 		Objects.requireNonNull(tcpAccept);
-		connectTCP(tcpAccept, tcpAccept.getRecipient(), () -> new TCPConnect(tcpAccept.getSender(),tcpAccept.getRecipient(),tcpAccept.getPassword()));
+		var key = new TCPKey(tcpAccept);
+		if (!TCPWaitingMap.containsKey(key)) {
+			chatContext.queueCommand(new TCPAbort(tcpAccept.getSender(), tcpAccept.getRecipient(), tcpAccept.getPassword()));
+		} else {
+			TCPWaitingMap.get(key).launch();
+		}
 	}
 	
 	/**
@@ -87,14 +76,55 @@ public class ChatOsClient {
 	 */
 	public void treatTCPAbort(TCPAbort tcpAbort) {
 		Objects.requireNonNull(tcpAbort);
-		if (TCPCommandMap.containsKey(tcpAbort.getRecipient()) || TCPCommandMap.containsKey(tcpAbort.getSender())) {
-			if (TCPCommandMap.remove(tcpAbort.getRecipient()) != null) {
-				TCPContextMap.remove(tcpAbort.getRecipient());//TODO close
+		if (TCPContextMap.containsKey(tcpAbort.getRecipient()) || TCPContextMap.containsKey(tcpAbort.getSender())) {
+			var context = TCPContextMap.remove(tcpAbort.getRecipient());
+			if (context != null) {
+				context.close();
 				System.out.println("TCP connection with " + tcpAbort.getRecipient() + " was aborted");
 			} else {
-				TCPCommandMap.remove(tcpAbort.getSender());
+				TCPContextMap.remove(tcpAbort.getSender()).close();
 				System.out.println("TCP connection with " + tcpAbort.getSender() + " was aborted");
 			}
+		}
+	}
+	
+	private class TCPKey {
+		private final String sender;
+		private final String recipient;
+		private final short  password;
+
+		/**
+		 * TCPKey constructor
+		 * @param sender the pseudonym of the sender client
+		 * @param recipient the pseudonym of the recipient client
+		 * @param password the TCP private connexion password
+		 */
+		public TCPKey(String sender, String recipient, short password) {
+			Objects.requireNonNull(sender);
+			Objects.requireNonNull(recipient);
+			this.sender = sender;
+			this.recipient = recipient;
+			this.password = password;
+		}
+		
+		public TCPKey(TCPDatagram request) {
+			this(request.getSender(),request.getRecipient(), request.getPassword());
+		}
+
+		@Override
+		public boolean equals(Object obj) {
+			if (!(obj instanceof TCPKey)){
+				return false;
+			}
+			var tcpKey = (TCPKey) obj;
+			return password == tcpKey.password
+					&& sender.equals(tcpKey.sender)
+					&& recipient.equals(tcpKey.recipient);
+		}
+
+		@Override
+		public int hashCode() {
+			return sender.hashCode()^recipient.hashCode()+password;
 		}
 	}
 	
@@ -108,8 +138,9 @@ public class ChatOsClient {
 	/**
 	 * Map of command for TCPContext
 	 */
-	private final HashMap<String,Queue<String>> TCPCommandMap = new HashMap<>();
+	private final HashMap<TCPKey, TCPContextWaiter> TCPWaitingMap = new HashMap<>();
 	private final HashMap<String, TCPContext>   TCPContextMap = new HashMap<>();
+	private final Random random = new Random();
 	
 	private final SocketChannel     sc;
 	private final Selector          selector;
@@ -138,20 +169,11 @@ public class ChatOsClient {
 	}
 	
 	/**
-	 * 
-	 * @param recipient the login of the recipient
-	 * @return the queue corresponding to the recipient
-	 */
-	public Queue<String> getTCPCommandQueue(String recipient) {
-		return TCPCommandMap.get(recipient);
-	}
-	
-	/**
 	 * Add the TCPContext to the context queue (erase the old one)
 	 * @param recipient the recipient linked to the context
 	 * @param context the context to put in the map
 	 */
-	public void putContextInContextQueue(String recipient, TCPContext context) {
+	public void putContextInContextQueue(String recipient, TCPHTTPContext context) {
 		Objects.requireNonNull(recipient);
 		Objects.requireNonNull(context);
 		TCPContextMap.put(recipient, context);
@@ -215,24 +237,42 @@ public class ChatOsClient {
 						continue;
 					}
 					var recipient = type[0].substring(1);
-					if (TCPCommandMap.containsKey(recipient)) {
+					if (TCPContextMap.containsKey(recipient)) {
 						//Le TCPContext existe d�ja ou est en cours de cr�ation.
-						TCPCommandMap.get(recipient).add(type[1]);
-						if (TCPContextMap.containsKey(recipient)) {
-							TCPContextMap.get(recipient).updateInterestOps();
-						}
+						TCPContextMap.get(recipient).queueCommand(type[1]);
 						return;
-					} else {
-						//Le TCPContext n'a pas encore �t� demand� pour ce destinataire -> on le cr�e
-						var list = new LinkedList<String>();
-						list.add(type[1]);
-						TCPCommandMap.put(recipient, list);
+					} else{
+						//TODO TCPWAITING
 						//TODO random short & save it
-						datagram = new TCPAsk(login, recipient,(short) 1);
+						var request = new TCPAsk(login, recipient,(short) random.nextInt(Short.MAX_VALUE));
+						if (!TCPContextMap.containsKey(recipient)) {
+							initiateTCPProtocole(request, type[1]);
+						} else {
+							TCPContextMap.get(recipient).queueCommand(type[1]);
+						}
+						
+						datagram = request;
 					}
 				}
 			}
 			chatContext.queueCommand(datagram);
+		}
+	}
+	
+	private void initiateTCPProtocole(TCPAsk tcpAsk, String command) {
+		try {
+			var socket = SocketChannel.open();
+			socket.configureBlocking(false);
+			socket.connect(serverAddress);
+			var newKey = socket.register(selector, SelectionKey.OP_READ);
+			var context = new TCPContextWaiter(newKey, socket, tcpAsk.getRecipient(),  new TCPConnect(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()).toByteBuffer(logger).get(),this);
+			context.queueCommand(command);
+			newKey.attach(context);
+			TCPContextMap.put(tcpAsk.getRecipient(), context);
+			TCPWaitingMap.put(new TCPKey(tcpAsk), context);
+		} catch(IOException e) {
+			//Aborting connection
+			chatContext.queueCommand(new TCPAbort(tcpAsk.getSender(), tcpAsk.getRecipient(), tcpAsk.getPassword()));
 		}
 	}
 	

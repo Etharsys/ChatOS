@@ -4,12 +4,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
+import java.util.LinkedList;
 import java.util.Objects;
+import java.util.Queue;
 
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.reader.OpCodeReader;
 
-class TCPContextWaiter implements Context{
+class TCPContextWaiter implements TCPPContext{
 	private final String recipient;
 	private final ChatOsClient client;
 	
@@ -17,6 +19,7 @@ class TCPContextWaiter implements Context{
 	private final SocketChannel socket;
 	private final ByteBuffer bbin = ByteBuffer.allocate(2);
 	private final ByteBuffer bbout;
+	private final Queue<String> commandQueue = new LinkedList<>();
 	
 	private boolean closed;
 	
@@ -115,5 +118,16 @@ class TCPContextWaiter implements Context{
 			return;
 		}
 		updateInterestOps();
+	}
+
+	@Override
+	public void queueCommand(String command) {
+		commandQueue.add(command);
+	}
+
+	@Override
+	public void close() {
+		closed = true;
+		silentlyClose();
 	}
 }

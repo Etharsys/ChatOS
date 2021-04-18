@@ -89,6 +89,7 @@ public class ChatOsClient {
 		Objects.requireNonNull(tcpAbort);
 		if (TCPCommandMap.containsKey(tcpAbort.getRecipient()) || TCPCommandMap.containsKey(tcpAbort.getSender())) {
 			if (TCPCommandMap.remove(tcpAbort.getRecipient()) != null) {
+				TCPContextMap.remove(tcpAbort.getRecipient());//TODO close
 				System.out.println("TCP connection with " + tcpAbort.getRecipient() + " was aborted");
 			} else {
 				TCPCommandMap.remove(tcpAbort.getSender());

@@ -53,9 +53,6 @@
         <path refid="ChatOS.classpath"/>
         <path refid="JUnit 5.libraryclasspath"/>
     </path>
-    <path id="javadoc.classpath">
-    	<path refid="JUnit 5.libraryclasspath"/>
-    </path>
     <target name="init">
         <mkdir dir="bin"/>
         <copy includeemptydirs="false" todir="bin">
@@ -67,6 +64,7 @@
     </target>
     <target name="clean">
         <delete dir="bin"/>
+    	
     </target>
     <target depends="clean" name="cleanall"/>
     <target depends="build-subprojects,build-project" name="build"/>
@@ -158,13 +156,11 @@
     <property name="jar.dir" value="jar"/>
 	<property name="doc.dir" value="doc/javadoc"/>
 	<property name="build.dir" value="bin"/>
-    
-              	
+
     <target name="all" depends="generate-javadoc,build-jar"/>
 	<target name = "generate-javadoc">
 		<mkdir dir="${doc.dir}"/>
 		<javadoc package="fr.upem.net.chatos.*" sourcepath="${src.dir}" destdir="${doc.dir}" version="true">
-			<classpath refid="javadoc.classpath"/>
 		</javadoc>
 	</target>
               	

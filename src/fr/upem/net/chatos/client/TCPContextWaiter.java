@@ -20,6 +20,7 @@ class TCPContextWaiter implements TCPContext{
 	private final ByteBuffer bbin = ByteBuffer.allocate(2);
 	private final ByteBuffer bbout;
 	private final Queue<String> commandQueue = new LinkedList<>();
+	private final Queue<String> targetQueue  = new LinkedList<>();
 	
 	private boolean closed;
 	
@@ -77,7 +78,7 @@ class TCPContextWaiter implements TCPContext{
 			if (err.getErrorCode() != ErrorCode.OK) {
 				closed = true;
 			} else {
-				var context = new TCPHTTPContext(contextKey,socket,commandQueue);
+				var context = new TCPHTTPContext(contextKey,socket,commandQueue, targetQueue);
 				contextKey.attach(context);
 				client.putContextInContextQueue(recipient, context);
 				System.out.println("Connection TCP with " + recipient + " enabled");
@@ -124,8 +125,9 @@ class TCPContextWaiter implements TCPContext{
 	}
 
 	@Override
-	public void queueCommand(String command) {
+	public void queueCommand(String command, String target) {
 		commandQueue.add(command);
+		targetQueue.add(target);
 	}
 
 	@Override

@@ -7,7 +7,9 @@ import java.nio.channels.SocketChannel;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.Collection;
 import java.util.LinkedList;
 import java.util.List;
@@ -44,14 +46,12 @@ class TCPHTTPContext implements TCPContext{
 	private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
 	
 	private final Queue<String> commandQueue = new LinkedList<>();
+	private final Queue<String> targetQueue  = new LinkedList<>();
 	
 	private boolean closed;
 	
-	//private boolean waitingData   = true;
-	//private boolean waitingAnswer = false;
-	
 	private Status state = Status.WQ;
-	
+			
 	private String       HTTPanswer  = "";
 	private List<String> fileLines   = List.of();
 	private ByteBuffer   currentLine = ByteBuffer.allocate(0); 
@@ -65,14 +65,19 @@ class TCPHTTPContext implements TCPContext{
 	 * @param socket the original socket channel
 	 * @param recipient the pseudonym of the TCP private connexion recipient
 	 */
-	public TCPHTTPContext(SelectionKey key, SocketChannel sc, Collection<String> commandQueue) {
+	public TCPHTTPContext(SelectionKey key, SocketChannel sc, Collection<String> commandQueue, Collection<String> targetQueue) {
 		logger.severe("Created TCP Context");
 		Objects.requireNonNull(key);
 		Objects.requireNonNull(sc);
 		Objects.requireNonNull(commandQueue);
+		Objects.requireNonNull(targetQueue);
+		if (targetQueue.size() != commandQueue.size()) {
+			throw new IllegalArgumentException("Size between queues are not the same");
+		}
 		this.key = key;
 		this.sc = sc;
 		this.commandQueue.addAll(commandQueue);
+		this.targetQueue.addAll(targetQueue);
 		updateInterestOps();
 	}
 
@@ -132,17 +137,25 @@ class TCPHTTPContext implements TCPContext{
 			stringReader.reset();
 			System.out.println(HTTPanswer);
 			
-			fileLines = Files.readAllLines(Path.of(HTTPanswer), ASCII);
-			var length = fileLines.stream().collect(Collectors.summingInt(s -> s.length())) + fileLines.size();
-			currentLine = ASCII.encode(
-					  "HTTP/1.0 200 OK\r\n"
-					+ "Content-Type: text/html\r\n"
-					+ "Content-Length: " + length + "\r\n");
+			try {				
+				fileLines = Files.readAllLines(Path.of(HTTPanswer), ASCII);
+				var content_type = HTTPanswer.endsWith(".txt") ? "text" : "unknown";
+				var length = fileLines.stream().collect(Collectors.summingInt(s -> s.length())) + fileLines.size();
+				currentLine = ASCII.encode(
+						"HTTP/1.0 200 OK\r\n"
+								+ "Content-Type: " + content_type + "\r\n"
+								+ "Content-Length: " + length + "\r\n");
+			} catch (NoSuchFileException nsfe) {
+				currentLine = ASCII.encode(
+						"HTTP/1.0 404 NotFound\r\n"
+								+ "Content-Type: unknown\r\n"
+								+ "Content-Length: 0\r\n");
+			}
 			state = Status.AN;
 		}
 	}
 	
-	private void processInAnswer() {
+	private void processInAnswer() throws IOException {
 		var ps = httpreader.process(bbin);
 		switch (ps) {
 		case ERROR : 
@@ -152,7 +165,18 @@ class TCPHTTPContext implements TCPContext{
 		case REFILL :
 			break;
 		case DONE :
-			System.out.println("HTTP GET result from the TCP connexion : \n" + httpreader.get().getContent());
+			var header = httpreader.get().getHeader();
+			if (header.getResponce_code().equals("200 OK")) {				
+				if (header.getContent_type().equals("text")) {
+					System.out.println("HTTP GET result from the TCP connexion : \n" + httpreader.get().getContent());					
+				}
+				try (var bw = Files.newBufferedWriter(Path.of(targetQueue.poll()), ASCII, StandardOpenOption.WRITE,
+						StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
+					bw.write(httpreader.get().getContent());
+				}
+			} else {
+				System.out.println("The requested file cannot be found, get ERROR 404 NotFound");
+			}
 			httpreader.reset();
 			state = Status.WQ;
 			break;
@@ -253,9 +277,11 @@ class TCPHTTPContext implements TCPContext{
 	}
 
 	@Override
-	public void queueCommand(String command) {
+	public void queueCommand(String command, String target) {
 		Objects.requireNonNull(command);
+		Objects.requireNonNull(target);
 		commandQueue.add(command);
+		targetQueue.add(target);
 		updateInterestOps();
 	}
 

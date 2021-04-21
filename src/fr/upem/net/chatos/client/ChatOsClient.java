@@ -231,24 +231,24 @@ public class ChatOsClient {
 					datagram = new PrivateMessage(login,type[0].substring(1), type[1]);
 				} else {
 					//TCP le pas beau a faire
-					var type = command.split(" ",2);
-					if (type.length != 2) {
+					var type = command.split(" ",3);
+					if (type.length != 3) {
 						System.out.println("not enough args");
 						continue;
 					}
 					var recipient = type[0].substring(1);
 					if (TCPContextMap.containsKey(recipient)) {
 						//Le TCPContext existe d�ja ou est en cours de cr�ation.
-						TCPContextMap.get(recipient).queueCommand(type[1]);
+						TCPContextMap.get(recipient).queueCommand(type[1], type[2]);
 						return;
 					} else{
 						//TODO TCPWAITING
 						//TODO random short & save it
 						var request = new TCPAsk(login, recipient,(short) random.nextInt(Short.MAX_VALUE));
 						if (!TCPContextMap.containsKey(recipient)) {
-							initiateTCPProtocole(request, type[1]);
+							initiateTCPProtocole(request, type[1], type[2]);
 						} else {
-							TCPContextMap.get(recipient).queueCommand(type[1]);
+							TCPContextMap.get(recipient).queueCommand(type[1], type[2]);
 						}
 						
 						datagram = request;
@@ -259,14 +259,14 @@ public class ChatOsClient {
 		}
 	}
 	
-	private void initiateTCPProtocole(TCPAsk tcpAsk, String command) {
+	private void initiateTCPProtocole(TCPAsk tcpAsk, String command, String target) {
 		try {
 			var socket = SocketChannel.open();
 			socket.configureBlocking(false);
 			socket.connect(serverAddress);
 			var newKey = socket.register(selector, SelectionKey.OP_READ);
 			var context = new TCPContextWaiter(newKey, socket, tcpAsk.getRecipient(),  new TCPConnect(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()).toByteBuffer(logger).get(),this);
-			context.queueCommand(command);
+			context.queueCommand(command, target);
 			newKey.attach(context);
 			TCPContextMap.put(tcpAsk.getRecipient(), context);
 			TCPWaitingMap.put(new TCPKey(tcpAsk), context);

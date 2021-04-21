@@ -11,7 +11,9 @@ import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
@@ -39,19 +41,8 @@ public class ChatOsClient {
 	public void treatTCPAsk(TCPAsk tcpAsk){
 		Objects.requireNonNull(tcpAsk);
 		//Always yes
-		try {
-			var socket = SocketChannel.open();
-			socket.configureBlocking(false);
-			socket.connect(serverAddress);
-			var newKey = socket.register(selector, SelectionKey.OP_READ);
-			var context = new TCPContextWaiter(newKey, socket, tcpAsk.getSender(),  new TCPAccept(tcpAsk.getSender(),tcpAsk.getRecipient(),tcpAsk.getPassword()).toByteBuffer(logger).get(),this);
-			context.launch();
-			newKey.attach(context);
-			TCPContextMap.put(tcpAsk.getSender(), context);
-		} catch(IOException e) {
-			//Aborting connection
-			chatContext.queueCommand(new TCPAbort(tcpAsk.getSender(), tcpAsk.getRecipient(), tcpAsk.getPassword()));
-		}
+		System.out.println("Received a TCP connection request from : " + tcpAsk.getSender() + ", will you accept? (y/n)");
+		TCPAskQueue.add(new TCPKey(tcpAsk));
 	}
 	
 	/**
@@ -85,6 +76,22 @@ public class ChatOsClient {
 				TCPContextMap.remove(tcpAbort.getSender()).close();
 				System.out.println("TCP connection with " + tcpAbort.getSender() + " was aborted");
 			}
+		}
+	}
+	
+	private void acceptTCPAsk(TCPKey tcpKey) {
+		try {
+			var socket = SocketChannel.open();
+			socket.configureBlocking(false);
+			socket.connect(serverAddress);
+			var newKey = socket.register(selector, SelectionKey.OP_READ);
+			var context = new TCPContextWaiter(newKey, socket, tcpKey.sender,  new TCPAccept(tcpKey.sender,tcpKey.recipient,tcpKey.password).toByteBuffer(logger).get(),this);
+			context.launch();
+			newKey.attach(context);
+			TCPContextMap.put(tcpKey.sender, context);
+		} catch(IOException e) {
+			//Aborting connection
+			chatContext.queueCommand(new TCPAbort(tcpKey.sender, tcpKey.recipient, tcpKey.password));
 		}
 	}
 	
@@ -140,6 +147,7 @@ public class ChatOsClient {
 	 */
 	private final HashMap<TCPKey, TCPContextWaiter> TCPWaitingMap = new HashMap<>();
 	private final HashMap<String, TCPContext>   TCPContextMap = new HashMap<>();
+	private final Queue<TCPKey> TCPAskQueue = new LinkedList<>();
 	private final Random random = new Random();
 	
 	private final SocketChannel     sc;
@@ -224,6 +232,19 @@ public class ChatOsClient {
 	private void processCommands() {
 		while (!commandQueue.isEmpty()) {
 			var command = commandQueue.poll();
+			
+			if (!TCPAskQueue.isEmpty()) {
+				if (command.equals("y")) {
+					var tcpKey = TCPAskQueue.poll();
+					acceptTCPAsk(tcpKey);
+					continue;
+				}
+				if (command.equals("n")) {
+					var tcpKey = TCPAskQueue.poll();
+					chatContext.queueCommand(new TCPAbort(tcpKey.sender, tcpKey.recipient, tcpKey.password));
+					continue;
+				}
+			}
 			
 			Datagram datagram;
 			if (!command.startsWith("@") && !command.startsWith("/")) {

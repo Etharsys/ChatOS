@@ -20,8 +20,8 @@ public interface Reader<T> {
 
     /**
      * 
-     * @brief get the reader result value (datagram)
-     * @return the datagram
+     * @brief get the reader result value (frame)
+     * @return the frame
      */
     public T get();
 

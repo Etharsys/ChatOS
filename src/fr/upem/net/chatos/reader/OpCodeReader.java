@@ -125,7 +125,7 @@ public class OpCodeReader{
 	 * 
 	 * @brief accept the visitor method
 	 * @param <T> the parametized type
-	 * @param visitor the datagram visitor (parametized with T)
+	 * @param visitor the frame visitor (parametized with T)
 	 * @param context the actual context
 	 */
 	public <T> void accept(FrameVisitor<T> visitor, T context) {

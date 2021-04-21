@@ -189,7 +189,7 @@ public class ChatOsServer {
     /**
      * 
      * @brief accept the connexion of a TCP private connexion if possible
-     * @param message the tcp datagram request
+     * @param message the tcp frame request
      * @param context the concerned context
      * @param consumer the selected key (TCPKey on a consumer)
      * @return the ErrorCode in terms of some tests

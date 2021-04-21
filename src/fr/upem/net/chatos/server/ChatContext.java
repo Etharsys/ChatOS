@@ -290,8 +290,8 @@ class ChatContext implements Context {
      */
     private void processOut() {
 		while (!queue.isEmpty()) {
-			var datagram = queue.peek();
-			var optBB = datagram.toByteBuffer(logger);
+			var frame = queue.peek();
+			var optBB = frame.toByteBuffer(logger);
 			if (optBB.isEmpty()) {
 				queue.remove();
 			}

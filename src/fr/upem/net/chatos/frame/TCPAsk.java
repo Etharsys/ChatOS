@@ -9,7 +9,7 @@ import fr.upem.net.chatos.reader.OpCodeReader;
 public class TCPAsk extends AbstractTCPFrame{
 	
 	/**
-	 * TCPAsk constructor : packet TCPAbort datagram
+	 * TCPAsk constructor : packet TCPAbort frame
 	 * @param sender the pseudo of the TCP private connexion sender
 	 * @param recipient the pseudo of the TCP private connexion recipient
 	 * @param password the TCP private connexion password

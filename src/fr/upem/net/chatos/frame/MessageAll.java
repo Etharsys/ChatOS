@@ -12,7 +12,7 @@ public class MessageAll implements Frame{
 	private final String message;
 	
 	/**
-	 * MessageAll constructor : public message datagram, MessageAll packet
+	 * MessageAll constructor : public message frame, MessageAll packet
 	 * @param sender the pseudo of the message sender 
 	 * @param message the message to send
 	 */

@@ -13,7 +13,7 @@ public class PrivateMessage implements Frame{
 	private final String message;
 	
 	/**
-	 * PrivateMessage constructor : private message datagram, PrivateMessage packet
+	 * PrivateMessage constructor : private message frame, PrivateMessage packet
 	 * @param sender the pseudo of the message sender
 	 * @param recipient the pseudo of the recipient who will get the message
 	 * @param message the message to send

@@ -4,7 +4,7 @@ public interface FrameVisitor<T> {
 	
 	/**
 	 * 
-	 * @brief visit the datagram visitor
+	 * @brief visit the frame visitor
 	 * @param reader the reader for a connexion request
 	 * @param context the actual context
 	 */
@@ -12,7 +12,7 @@ public interface FrameVisitor<T> {
 	
 	/**
 	 * 
-	 * @brief visit the datagram visitor
+	 * @brief visit the frame visitor
 	 * @param reader the reader for a private message reader
 	 * @param context the actual context
 	 */
@@ -20,7 +20,7 @@ public interface FrameVisitor<T> {
 	
 	/**
 	 * 
-	 * @brief visit the datagram visitor
+	 * @brief visit the frame visitor
 	 * @param reader the reader for a public message reader
 	 * @param context the actual context
 	 */
@@ -28,7 +28,7 @@ public interface FrameVisitor<T> {
 	
 	/**
 	 * 
-	 * @brief visit the datagram visitor
+	 * @brief visit the frame visitor
 	 * @param reader the reader for an error reader
 	 * @param context the actual context
 	 */
@@ -36,7 +36,7 @@ public interface FrameVisitor<T> {
 
 	/**
 	 * 
-	 * @brief visit the datagram visitor
+	 * @brief visit the frame visitor
 	 * @param reader the reader for a TCP private connexion ask request
 	 * @param context the actual context
 	 */
@@ -44,7 +44,7 @@ public interface FrameVisitor<T> {
 
 	/**
 	 * 
-	 * @brief visit the datagram visitor
+	 * @brief visit the frame visitor
 	 * @param reader the reader for a TCP private connexion abort request
 	 * @param context the actual context
 	 */
@@ -52,7 +52,7 @@ public interface FrameVisitor<T> {
 
 	/**
 	 * 
-	 * @brief visit the datagram visitor
+	 * @brief visit the frame visitor
 	 * @param reader the reader for a TCP private connexion connect request
 	 * @param context the actual context
 	 */
@@ -60,7 +60,7 @@ public interface FrameVisitor<T> {
 
 	/**
 	 * 
-	 * @brief visit the datagram visitor
+	 * @brief visit the frame visitor
 	 * @param reader the reader for a TCP private connexion accept request
 	 * @param context the actual context
 	 */

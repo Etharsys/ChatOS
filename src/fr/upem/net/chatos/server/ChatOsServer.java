@@ -24,7 +24,7 @@ import fr.upem.net.chatos.datagram.TCPAbort;
 import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
-import fr.upem.net.chatos.datagram.TCPDatagram;
+import fr.upem.net.chatos.datagram.TCPFrame;
 
 
 public class ChatOsServer {
@@ -194,7 +194,7 @@ public class ChatOsServer {
      * @param consumer the selected key (TCPKey on a consumer)
      * @return the ErrorCode in terms of some tests
      */
-    private byte acceptConnectionTMP(TCPDatagram message, Consumer<TCPLink> consumer) {
+    private byte acceptConnectionTMP(TCPFrame message, Consumer<TCPLink> consumer) {
     	if (!clientLoginMap.containsKey(message.getSender())) {
     		return ErrorCode.UNREACHABLE_USER;
     	}

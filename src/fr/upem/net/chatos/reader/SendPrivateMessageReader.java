@@ -5,7 +5,7 @@ import java.util.Objects;
 
 import fr.upem.net.chatos.datagram.PrivateMessage;
 
-public class SendPrivateMessageReader implements DatagramReader<PrivateMessage>{
+public class SendPrivateMessageReader implements FrameReader<PrivateMessage>{
 	private enum State {
 		DONE,
 		WAITING_SENDER_LOGIN, 
@@ -23,7 +23,7 @@ public class SendPrivateMessageReader implements DatagramReader<PrivateMessage>{
 
     
 	@Override
-	public <T>void accept(DatagramVisitor<T> visitor, T context) {
+	public <T>void accept(FrameVisitor<T> visitor, T context) {
 		Objects.requireNonNull(visitor);
 		visitor.visit(this, context);
 	}

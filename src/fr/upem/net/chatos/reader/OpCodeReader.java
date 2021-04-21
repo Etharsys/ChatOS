@@ -37,7 +37,7 @@ public class OpCodeReader{
 	private final TCPAbortReader           TCPDenied  = new TCPAbortReader();
 	private final TCPConnectReader         TCPConnect = new TCPConnectReader();
 	
-	private Optional<DatagramReader<?>> reader = Optional.empty();
+	private Optional<FrameReader<?>> reader = Optional.empty();
 	
 	/**
 	 * 
@@ -128,7 +128,7 @@ public class OpCodeReader{
 	 * @param visitor the datagram visitor (parametized with T)
 	 * @param context the actual context
 	 */
-	public <T> void accept(DatagramVisitor<T> visitor, T context) {
+	public <T> void accept(FrameVisitor<T> visitor, T context) {
 		Objects.requireNonNull(visitor);
 		if (state != State.DONE) {
 			throw new IllegalStateException();

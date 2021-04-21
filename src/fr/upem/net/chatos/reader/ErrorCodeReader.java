@@ -5,7 +5,7 @@ import java.util.Objects;
 
 import fr.upem.net.chatos.datagram.ErrorCode;
 
-public class ErrorCodeReader implements DatagramReader<ErrorCode>{
+public class ErrorCodeReader implements FrameReader<ErrorCode>{
 	
 	/**
 	 * the status of the reader for a ErrorCode request
@@ -20,7 +20,7 @@ public class ErrorCodeReader implements DatagramReader<ErrorCode>{
 	private byte code;
 	
 	@Override
-	public <T>void accept(DatagramVisitor<T> visitor, T context) {
+	public <T>void accept(FrameVisitor<T> visitor, T context) {
 		Objects.requireNonNull(visitor);
 		visitor.visit(this,context);
 	}

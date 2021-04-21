@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
 
-abstract class AbstractTCPDatagram implements TCPDatagram{
+abstract class AbstractTCPDatagram implements TCPFrame{
 	private final String sender;
 	private final String recipient;
 	private final short  password;

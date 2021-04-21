@@ -3,7 +3,7 @@ package fr.upem.net.chatos.reader;
 /**
  * Interface representing datagrams readers able to read datagrams without OpCode
  * */
-public interface DatagramReader<E> extends Reader<E>{
+public interface FrameReader<E> extends Reader<E>{
 	
 	/**
 	 * 
@@ -12,6 +12,6 @@ public interface DatagramReader<E> extends Reader<E>{
 	 * @param visitor the datagram visitor (parametized with T)
 	 * @param context the actual context
 	 */
-	public <T> void accept(DatagramVisitor<T> visitor, T context);
+	public <T> void accept(FrameVisitor<T> visitor, T context);
 	
 }

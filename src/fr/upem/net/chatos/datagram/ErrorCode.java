@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 
 import fr.upem.net.chatos.reader.OpCodeReader;
 
-public class ErrorCode implements Datagram {
+public class ErrorCode implements Frame {
 	static public final byte OK                   = 1;
 	static public final byte PSEUDO_UNAVAILABLE   = 2;
 	static public final byte INVALID_PSEUDONYM    = 3;

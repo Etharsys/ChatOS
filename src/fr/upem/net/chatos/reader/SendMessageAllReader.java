@@ -6,7 +6,7 @@ import java.util.Objects;
 import fr.upem.net.chatos.datagram.MessageAll;
 
 
-public class SendMessageAllReader implements DatagramReader<MessageAll> {
+public class SendMessageAllReader implements FrameReader<MessageAll> {
 	private enum State {
 		DONE,
 		WAITING_LOGIN, 
@@ -22,7 +22,7 @@ public class SendMessageAllReader implements DatagramReader<MessageAll> {
 
     
 	@Override
-	public <T>void accept(DatagramVisitor<T> visitor, T context) {
+	public <T>void accept(FrameVisitor<T> visitor, T context) {
 		Objects.requireNonNull(visitor);
 		visitor.visit(this, context);
 	}

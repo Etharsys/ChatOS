@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import fr.upem.net.chatos.reader.ConnectionRequestReader;
-import fr.upem.net.chatos.reader.DatagramVisitor;
+import fr.upem.net.chatos.reader.FrameVisitor;
 import fr.upem.net.chatos.reader.ErrorCodeReader;
 import fr.upem.net.chatos.reader.OpCodeReader;
 import fr.upem.net.chatos.reader.SendMessageAllReader;
@@ -28,7 +28,7 @@ class OpCodeReaderTest {
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldContainCRAfterOpCode1() {
-		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+		FrameVisitor<Void> visitor = new FrameVisitor<Void>(){
 
 			@Override
 			public void visit(ConnectionRequestReader reader, Void Context) {
@@ -76,7 +76,7 @@ class OpCodeReaderTest {
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldContainSPMAfterOpCode2() {
-		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+		FrameVisitor<Void> visitor = new FrameVisitor<Void>(){
 
 			@Override
 			public void visit(ConnectionRequestReader reader, Void Context) {
@@ -127,7 +127,7 @@ class OpCodeReaderTest {
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldContainSMAAfterOpCode3() {
-		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+		FrameVisitor<Void> visitor = new FrameVisitor<Void>(){
 
 			@Override
 			public void visit(ConnectionRequestReader reader, Void Context) {
@@ -176,7 +176,7 @@ class OpCodeReaderTest {
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldReturnERRORWhenFacing6() {
-		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+		FrameVisitor<Void> visitor = new FrameVisitor<Void>(){
 
 			@Override
 			public void visit(ConnectionRequestReader reader, Void Context) {
@@ -233,7 +233,7 @@ class OpCodeReaderTest {
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldThrowWhenAcceptingTooEarly() {
-		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+		FrameVisitor<Void> visitor = new FrameVisitor<Void>(){
 
 			@Override
 			public void visit(ConnectionRequestReader reader, Void Context) {
@@ -276,7 +276,7 @@ class OpCodeReaderTest {
 	@Tag("OpCodeReader")
 	@Test
 	public void OpCodeShouldCorrectlyReset() {
-		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+		FrameVisitor<Void> visitor = new FrameVisitor<Void>(){
 
 			@Override
 			public void visit(ConnectionRequestReader reader, Void Context) {

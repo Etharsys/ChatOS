@@ -3,12 +3,12 @@ package fr.upem.net.chatos.reader;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-public class ConnectionRequestReader implements DatagramReader<String>{
+public class ConnectionRequestReader implements FrameReader<String>{
 	
 	private final StringReader reader = new StringReader();
 
 	@Override
-	public <T>void accept(DatagramVisitor<T> visitor, T context) {
+	public <T>void accept(FrameVisitor<T> visitor, T context) {
 		Objects.requireNonNull(visitor);
 		visitor.visit(this, context);
 	}

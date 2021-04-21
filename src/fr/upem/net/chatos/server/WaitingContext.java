@@ -9,12 +9,12 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.logging.Logger;
 
-import fr.upem.net.chatos.datagram.Datagram;
+import fr.upem.net.chatos.datagram.Frame;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPConnect;
 import fr.upem.net.chatos.reader.ConnectionRequestReader;
-import fr.upem.net.chatos.reader.DatagramVisitor;
+import fr.upem.net.chatos.reader.FrameVisitor;
 import fr.upem.net.chatos.reader.ErrorCodeReader;
 import fr.upem.net.chatos.reader.OpCodeReader;
 import fr.upem.net.chatos.reader.Reader.ProcessStatus;
@@ -33,7 +33,7 @@ class WaitingContext implements Context {
     final private SocketChannel   sc;
     final private ByteBuffer      bbin  = ByteBuffer.allocate(BUFFER_SIZE);
     final private ByteBuffer      bbout = ByteBuffer.allocate(BUFFER_SIZE);
-    final private Queue<Datagram> queue = new LinkedList<>();
+    final private Queue<Frame> queue = new LinkedList<>();
     final private ChatOsServer    server;
         
     private boolean closed;
@@ -52,7 +52,7 @@ class WaitingContext implements Context {
     }
         
        
-    final private DatagramVisitor<WaitingContext> visitor = new DatagramVisitor<WaitingContext>() {
+    final private FrameVisitor<WaitingContext> visitor = new FrameVisitor<WaitingContext>() {
 		@Override
 		public void visit(ConnectionRequestReader reader, WaitingContext context) {
 			Objects.requireNonNull(reader);

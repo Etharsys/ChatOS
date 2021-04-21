@@ -1,6 +1,6 @@
 package fr.upem.net.chatos.reader;
 
-public interface DatagramVisitor<T> {
+public interface FrameVisitor<T> {
 	
 	/**
 	 * 

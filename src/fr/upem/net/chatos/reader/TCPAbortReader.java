@@ -4,7 +4,7 @@ import fr.upem.net.chatos.datagram.TCPAbort;
 
 public class TCPAbortReader extends AbstractTCPDatagramReader<TCPAbort> {
 	@Override
-	public <T> void accept(DatagramVisitor<T> visitor, T context) {
+	public <T> void accept(FrameVisitor<T> visitor, T context) {
 		visitor.visit(this, context);
 	}
 

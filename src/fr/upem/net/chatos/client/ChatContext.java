@@ -9,13 +9,13 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.logging.Logger;
 
-import fr.upem.net.chatos.datagram.Datagram;
+import fr.upem.net.chatos.datagram.Frame;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.TCPAbort;
 import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.reader.ConnectionRequestReader;
-import fr.upem.net.chatos.reader.DatagramVisitor;
+import fr.upem.net.chatos.reader.FrameVisitor;
 import fr.upem.net.chatos.reader.ErrorCodeReader;
 import fr.upem.net.chatos.reader.OpCodeReader;
 import fr.upem.net.chatos.reader.SendMessageAllReader;
@@ -39,9 +39,9 @@ class ChatContext implements Context{
 	private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 	private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 
-	private final Queue<Datagram>       queue   = new LinkedList<>();
+	private final Queue<Frame>       queue   = new LinkedList<>();
 	private final OpCodeReader          reader  = new OpCodeReader();
-	private final DatagramVisitor<ChatContext> visitor = new DatagramVisitor<>(){
+	private final FrameVisitor<ChatContext> visitor = new FrameVisitor<>(){
 
 		@Override
 		public void visit(ConnectionRequestReader reader, ChatContext context) {
@@ -163,7 +163,7 @@ class ChatContext implements Context{
 	 * @brief add a command to the commands queue
 	 * @param frame the command to add
 	 */
-	public void queueCommand(Datagram frame) {
+	public void queueCommand(Frame frame) {
 		queue.add(frame);
 		processOut();
 		updateInterestOps();

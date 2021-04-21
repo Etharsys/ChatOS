@@ -21,7 +21,7 @@ import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Logger;
 
 import fr.upem.net.chatos.datagram.ConnectionRequest;
-import fr.upem.net.chatos.datagram.Datagram;
+import fr.upem.net.chatos.datagram.Frame;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.MessageAll;
 import fr.upem.net.chatos.datagram.PrivateMessage;
@@ -29,7 +29,7 @@ import fr.upem.net.chatos.datagram.TCPAbort;
 import fr.upem.net.chatos.datagram.TCPAccept;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.datagram.TCPConnect;
-import fr.upem.net.chatos.datagram.TCPDatagram;
+import fr.upem.net.chatos.datagram.TCPFrame;
 import fr.upem.net.chatos.reader.OpCodeReader;
 
 public class ChatOsClient {
@@ -114,7 +114,7 @@ public class ChatOsClient {
 			this.password = password;
 		}
 		
-		public TCPKey(TCPDatagram request) {
+		public TCPKey(TCPFrame request) {
 			this(request.getSender(),request.getRecipient(), request.getPassword());
 		}
 
@@ -246,7 +246,7 @@ public class ChatOsClient {
 				}
 			}
 			
-			Datagram datagram;
+			Frame datagram;
 			if (!command.startsWith("@") && !command.startsWith("/")) {
 				datagram = new MessageAll(login, command);
 			} else {

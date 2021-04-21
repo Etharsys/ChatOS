@@ -11,7 +11,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import fr.upem.net.chatos.reader.ConnectionRequestReader;
-import fr.upem.net.chatos.reader.DatagramVisitor;
+import fr.upem.net.chatos.reader.FrameVisitor;
 import fr.upem.net.chatos.reader.ErrorCodeReader;
 import fr.upem.net.chatos.reader.Reader.ProcessStatus;
 import fr.upem.net.chatos.reader.SendMessageAllReader;
@@ -68,7 +68,7 @@ public class SendPrivateMessageReaderTest {
 	@Tag("SendPrivateMessageReader")
 	@Test
 	public void SendPrivateMessageReaderShouldReturnTheCorrectMessage() {
-		DatagramVisitor<Void> visitor = new DatagramVisitor<Void>(){
+		FrameVisitor<Void> visitor = new FrameVisitor<Void>(){
 
 			@Override
 			public void visit(ConnectionRequestReader reader, Void Context) {

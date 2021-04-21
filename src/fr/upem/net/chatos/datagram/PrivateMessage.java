@@ -7,7 +7,7 @@ import java.util.logging.Logger;
 
 import fr.upem.net.chatos.reader.OpCodeReader;
 
-public class PrivateMessage implements Datagram{
+public class PrivateMessage implements Frame{
 	private final String sender;
 	private final String recipient;
 	private final String message;

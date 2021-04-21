@@ -9,14 +9,14 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.logging.Logger;
 
-import fr.upem.net.chatos.datagram.Datagram;
+import fr.upem.net.chatos.datagram.Frame;
 import fr.upem.net.chatos.datagram.ErrorCode;
 import fr.upem.net.chatos.datagram.MessageAll;
 import fr.upem.net.chatos.datagram.PrivateMessage;
 import fr.upem.net.chatos.datagram.TCPAbort;
 import fr.upem.net.chatos.datagram.TCPAsk;
 import fr.upem.net.chatos.reader.ConnectionRequestReader;
-import fr.upem.net.chatos.reader.DatagramVisitor;
+import fr.upem.net.chatos.reader.FrameVisitor;
 import fr.upem.net.chatos.reader.ErrorCodeReader;
 import fr.upem.net.chatos.reader.OpCodeReader;
 import fr.upem.net.chatos.reader.Reader.ProcessStatus;
@@ -35,10 +35,10 @@ class ChatContext implements Context {
     final private SocketChannel   sc;
     final private ByteBuffer      bbin  = ByteBuffer.allocate(BUFFER_SIZE);
     final private ByteBuffer      bbout = ByteBuffer.allocate(BUFFER_SIZE);
-    final private Queue<Datagram> queue = new LinkedList<>();
+    final private Queue<Frame> queue = new LinkedList<>();
     final private ChatOsServer    server;
 
-    final private DatagramVisitor<ChatContext> visitor = new DatagramVisitor<ChatContext>(){
+    final private FrameVisitor<ChatContext> visitor = new FrameVisitor<ChatContext>(){
 
     	@Override
     	public void visit(ConnectionRequestReader reader, ChatContext context) {
@@ -141,7 +141,7 @@ class ChatContext implements Context {
      * @brief Add a frame to the queue
      * @param frame the command to add
      */
-    public void queueFrame(Datagram frame) {
+    public void queueFrame(Frame frame) {
     	Objects.requireNonNull(frame);
     	queue.add(frame);
     	updateInterestOps();

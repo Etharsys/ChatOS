@@ -7,7 +7,7 @@ import java.util.logging.Logger;
 
 import fr.upem.net.chatos.reader.OpCodeReader;
 
-public class ConnectionRequest implements Datagram {
+public class ConnectionRequest implements Frame {
 	private final String pseudo;
 	
 	/**

@@ -9,7 +9,7 @@ public class TCPAskReader extends AbstractTCPDatagramReader<TCPAsk> {
 	}
 
 	@Override
-	public <T> void accept(DatagramVisitor<T> visitor, T context) {
+	public <T> void accept(FrameVisitor<T> visitor, T context) {
 		visitor.visit(this, context);
 	}
 }

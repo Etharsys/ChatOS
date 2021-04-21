@@ -4,7 +4,7 @@ import java.nio.ByteBuffer;
 import java.util.Optional;
 import java.util.logging.Logger;
 
-public interface TCPDatagram extends Datagram{
+public interface TCPFrame extends Frame{
 	
 	/**
 	 * @brief get the TCP private connexion password

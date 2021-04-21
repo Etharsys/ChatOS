@@ -3,9 +3,9 @@ package fr.upem.net.chatos.reader;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-import fr.upem.net.chatos.datagram.TCPFrame;
+import fr.upem.net.chatos.frame.TCPFrame;
 
-abstract class AbstractTCPDatagramReader<T extends TCPFrame> implements FrameReader<T> {
+abstract class AbstractTCPFrameReader<T extends TCPFrame> implements FrameReader<T> {
 	
 	/**
 	 * the status of the reader for a TCP private connexion request

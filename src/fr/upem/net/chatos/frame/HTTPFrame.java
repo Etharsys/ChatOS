@@ -1,4 +1,4 @@
-package fr.upem.net.chatos.datagram;
+package fr.upem.net.chatos.frame;
 
 import java.util.Objects;
 

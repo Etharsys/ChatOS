@@ -3,7 +3,7 @@ package fr.upem.net.chatos.reader;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-import fr.upem.net.chatos.datagram.PrivateMessage;
+import fr.upem.net.chatos.frame.PrivateMessage;
 
 public class SendPrivateMessageReader implements FrameReader<PrivateMessage>{
 	private enum State {

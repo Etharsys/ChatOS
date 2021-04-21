@@ -3,7 +3,7 @@ package fr.upem.net.chatos.reader;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-import fr.upem.net.chatos.datagram.ErrorCode;
+import fr.upem.net.chatos.frame.ErrorCode;
 
 public class ErrorCodeReader implements FrameReader<ErrorCode>{
 	

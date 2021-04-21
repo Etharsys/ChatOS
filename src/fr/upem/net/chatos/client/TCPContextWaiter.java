@@ -8,7 +8,7 @@ import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Queue;
 
-import fr.upem.net.chatos.datagram.ErrorCode;
+import fr.upem.net.chatos.frame.ErrorCode;
 import fr.upem.net.chatos.reader.OpCodeReader;
 
 class TCPContextWaiter implements TCPContext{

@@ -4,8 +4,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 
-import fr.upem.net.chatos.datagram.HTTPFrame;
-import fr.upem.net.chatos.datagram.HTTPHeader;
+import fr.upem.net.chatos.frame.HTTPFrame;
+import fr.upem.net.chatos.frame.HTTPHeader;
 
 
 public class HTTPReader implements Reader<HTTPFrame> {

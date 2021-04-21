@@ -9,12 +9,12 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.logging.Logger;
 
-import fr.upem.net.chatos.datagram.Frame;
-import fr.upem.net.chatos.datagram.ErrorCode;
-import fr.upem.net.chatos.datagram.MessageAll;
-import fr.upem.net.chatos.datagram.PrivateMessage;
-import fr.upem.net.chatos.datagram.TCPAbort;
-import fr.upem.net.chatos.datagram.TCPAsk;
+import fr.upem.net.chatos.frame.ErrorCode;
+import fr.upem.net.chatos.frame.Frame;
+import fr.upem.net.chatos.frame.MessageAll;
+import fr.upem.net.chatos.frame.PrivateMessage;
+import fr.upem.net.chatos.frame.TCPAbort;
+import fr.upem.net.chatos.frame.TCPAsk;
 import fr.upem.net.chatos.reader.ConnectionRequestReader;
 import fr.upem.net.chatos.reader.FrameVisitor;
 import fr.upem.net.chatos.reader.ErrorCodeReader;

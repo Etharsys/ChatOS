@@ -2,7 +2,7 @@ package fr.upem.net.chatos.reader;
 
 import java.nio.ByteBuffer;
 
-import fr.upem.net.chatos.datagram.HTTPHeader;
+import fr.upem.net.chatos.frame.HTTPHeader;
 
 public class HTTPHeaderReader implements Reader<HTTPHeader> {
 	

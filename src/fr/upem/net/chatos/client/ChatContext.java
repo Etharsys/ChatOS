@@ -9,11 +9,11 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.logging.Logger;
 
-import fr.upem.net.chatos.datagram.Frame;
-import fr.upem.net.chatos.datagram.ErrorCode;
-import fr.upem.net.chatos.datagram.TCPAbort;
-import fr.upem.net.chatos.datagram.TCPAccept;
-import fr.upem.net.chatos.datagram.TCPAsk;
+import fr.upem.net.chatos.frame.ErrorCode;
+import fr.upem.net.chatos.frame.Frame;
+import fr.upem.net.chatos.frame.TCPAbort;
+import fr.upem.net.chatos.frame.TCPAccept;
+import fr.upem.net.chatos.frame.TCPAsk;
 import fr.upem.net.chatos.reader.ConnectionRequestReader;
 import fr.upem.net.chatos.reader.FrameVisitor;
 import fr.upem.net.chatos.reader.ErrorCodeReader;
@@ -26,27 +26,27 @@ import fr.upem.net.chatos.reader.TCPAskReader;
 import fr.upem.net.chatos.reader.TCPConnectReader;
 import fr.upem.net.chatos.reader.Reader.ProcessStatus;
 
-class ChatContext implements Context{
-	static private int       MAX_STRING_SIZE = 1_024;
-	static private Logger    logger          = Logger.getLogger(ChatContext.class.getName());
+class ChatContext implements Context {
+	static private int MAX_STRING_SIZE = 1_024;
+	static private Logger logger = Logger.getLogger(ChatContext.class.getName());
 
-	private final SelectionKey  key;
+	private final SelectionKey key;
 	private final SocketChannel sc;
-	private final ChatOsClient  client;
+	private final ChatOsClient client;
 
 	private final int BUFFER_MAX_SIZE = (MAX_STRING_SIZE + Short.BYTES) * 3 + 1;
 
-	private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_MAX_SIZE);
+	private final ByteBuffer bbin = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 	private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_MAX_SIZE);
 
-	private final Queue<Frame>       queue   = new LinkedList<>();
-	private final OpCodeReader          reader  = new OpCodeReader();
-	private final FrameVisitor<ChatContext> visitor = new FrameVisitor<>(){
+	private final Queue<Frame> queue = new LinkedList<>();
+	private final OpCodeReader reader = new OpCodeReader();
+	private final FrameVisitor<ChatContext> visitor = new FrameVisitor<>() {
 
 		@Override
 		public void visit(ConnectionRequestReader reader, ChatContext context) {
-			//On ne devrait jamais arriver ici, on lit le paquet mais on l'ignore
-			//Do nothing
+			// On ne devrait jamais arriver ici, on lit le paquet mais on l'ignore
+			// Do nothing
 		}
 
 		@Override
@@ -64,7 +64,7 @@ class ChatContext implements Context{
 		@Override
 		public void visit(ErrorCodeReader reader, ChatContext context) {
 			System.out.println("Received an Error from the server : ");
-			switch(reader.get().getErrorCode()) {
+			switch (reader.get().getErrorCode()) {
 			case ErrorCode.ALREADY_CONNECTED:
 				System.out.println("ALREADY_CONNECTED");
 				break;
@@ -117,8 +117,8 @@ class ChatContext implements Context{
 
 		@Override
 		public void visit(TCPConnectReader reader, ChatContext context) {
-			//On ne devrait jamais arriver ici, on lit le paquet mais on l'ignore
-			//Do nothing
+			// On ne devrait jamais arriver ici, on lit le paquet mais on l'ignore
+			// Do nothing
 		}
 
 		@Override
@@ -133,14 +133,15 @@ class ChatContext implements Context{
 	};
 
 	private boolean closed = false;
-	
+
 	/**
 	 * ChatContext contructor
+	 * 
 	 * @param key the selected key to attach to this context (client)
 	 */
 	public ChatContext(SelectionKey key, ChatOsClient client) {
 		this.key = key;
-		this.sc  = (SocketChannel) key.channel();
+		this.sc = (SocketChannel) key.channel();
 		this.client = client;
 	}
 
@@ -170,7 +171,7 @@ class ChatContext implements Context{
 	}
 
 	/**
-	 * @brief process the  content of bbout
+	 * @brief process the content of bbout
 	 */
 	private void processOut() {
 		while (!queue.isEmpty()) {
@@ -193,18 +194,18 @@ class ChatContext implements Context{
 	 * @brief update the interestOps of the key
 	 */
 	private void updateInterestOps() {
-		var interesOps=0;
-        if (!closed && bbin.hasRemaining()){
-            interesOps|=SelectionKey.OP_READ;
-        }
-        if (bbout.position()!=0){
-            interesOps|=SelectionKey.OP_WRITE;
-        }
-        if (interesOps==0){
-            silentlyClose();
-            return;
-        }
-        key.interestOps(interesOps);
+		var interesOps = 0;
+		if (!closed && bbin.hasRemaining()) {
+			interesOps |= SelectionKey.OP_READ;
+		}
+		if (bbout.position() != 0) {
+			interesOps |= SelectionKey.OP_WRITE;
+		}
+		if (interesOps == 0) {
+			silentlyClose();
+			return;
+		}
+		key.interestOps(interesOps);
 	}
 
 	/**
@@ -214,7 +215,7 @@ class ChatContext implements Context{
 		try {
 			sc.close();
 		} catch (IOException ioe) {
-			//ignore exception
+			// ignore exception
 		}
 	}
 
@@ -239,7 +240,7 @@ class ChatContext implements Context{
 
 	@Override
 	public void doConnect() throws IOException {
-		//Impossible
+		// Impossible
 		key.interestOps(SelectionKey.OP_READ);
 	}
 
@@ -248,7 +249,7 @@ class ChatContext implements Context{
 	 * @brief treat the specific request TCPAsk
 	 * @param tcpAsk the frame which represent the request
 	 */
-	public void treatTCPAsk(TCPAsk tcpAsk){
+	public void treatTCPAsk(TCPAsk tcpAsk) {
 		Objects.requireNonNull(tcpAsk);
 		client.treatTCPAsk(tcpAsk);
 	}

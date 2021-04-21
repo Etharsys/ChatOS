@@ -20,16 +20,16 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Logger;
 
-import fr.upem.net.chatos.datagram.ConnectionRequest;
-import fr.upem.net.chatos.datagram.Frame;
-import fr.upem.net.chatos.datagram.ErrorCode;
-import fr.upem.net.chatos.datagram.MessageAll;
-import fr.upem.net.chatos.datagram.PrivateMessage;
-import fr.upem.net.chatos.datagram.TCPAbort;
-import fr.upem.net.chatos.datagram.TCPAccept;
-import fr.upem.net.chatos.datagram.TCPAsk;
-import fr.upem.net.chatos.datagram.TCPConnect;
-import fr.upem.net.chatos.datagram.TCPFrame;
+import fr.upem.net.chatos.frame.ConnectionRequest;
+import fr.upem.net.chatos.frame.ErrorCode;
+import fr.upem.net.chatos.frame.Frame;
+import fr.upem.net.chatos.frame.MessageAll;
+import fr.upem.net.chatos.frame.PrivateMessage;
+import fr.upem.net.chatos.frame.TCPAbort;
+import fr.upem.net.chatos.frame.TCPAccept;
+import fr.upem.net.chatos.frame.TCPAsk;
+import fr.upem.net.chatos.frame.TCPConnect;
+import fr.upem.net.chatos.frame.TCPFrame;
 import fr.upem.net.chatos.reader.OpCodeReader;
 
 public class ChatOsClient {

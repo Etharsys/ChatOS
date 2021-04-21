@@ -3,7 +3,7 @@ package fr.upem.net.chatos.reader;
 import java.nio.ByteBuffer;
 import java.util.Objects;
 
-import fr.upem.net.chatos.datagram.MessageAll;
+import fr.upem.net.chatos.frame.MessageAll;
 
 
 public class SendMessageAllReader implements FrameReader<MessageAll> {

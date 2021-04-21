@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 
 import fr.upem.net.chatos.reader.OpCodeReader;
 
-public class TCPConnect extends AbstractTCPDatagram {
+public class TCPConnect extends AbstractTCPFrame {
 
 	/**
 	 * TCPConnect constructor : packet TCPAbort datagram

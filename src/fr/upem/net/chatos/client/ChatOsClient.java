@@ -246,9 +246,9 @@ public class ChatOsClient {
 				}
 			}
 			
-			Frame datagram;
+			Frame frame;
 			if (!command.startsWith("@") && !command.startsWith("/")) {
-				datagram = new MessageAll(login, command);
+				frame = new MessageAll(login, command);
 			} else {
 				if (command.startsWith("@")) {
 					var type = command.split(" ",2);
@@ -256,7 +256,7 @@ public class ChatOsClient {
 						System.out.println("not enough args");
 						continue;
 					}
-					datagram = new PrivateMessage(login,type[0].substring(1), type[1]);
+					frame = new PrivateMessage(login,type[0].substring(1), type[1]);
 				} else {
 					//TCP le pas beau a faire
 					var type = command.split(" ",3);
@@ -277,11 +277,11 @@ public class ChatOsClient {
 							TCPContextMap.get(recipient).queueCommand(type[1], type[2]);
 						}
 						
-						datagram = request;
+						frame = request;
 					}
 				}
 			}
-			chatContext.queueCommand(datagram);
+			chatContext.queueCommand(frame);
 		}
 	}
 	

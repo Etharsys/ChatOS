@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 
 import fr.upem.net.chatos.reader.OpCodeReader;
 
-public class TCPAccept extends AbstractTCPDatagram{
+public class TCPAccept extends AbstractTCPFrame{
 	
 	/**
 	 * TCPAccept constructor : packet TCPAccept datagram

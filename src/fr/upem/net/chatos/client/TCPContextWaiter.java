@@ -29,7 +29,7 @@ class TCPContextWaiter implements TCPContext{
 	 * @param contextKey the original context key
 	 * @param socket the original socket channel
 	 * @param recipient the pseudonym of the TCP private connexion recipient
-	 * @param buffer the buffer of the TCPDatagram request
+	 * @param buffer the buffer of the TCPFrame request
 	 */
 	public TCPContextWaiter(SelectionKey contextKey, SocketChannel socket, String recipient, ByteBuffer buffer,ChatOsClient client) {
 		Objects.requireNonNull(contextKey);

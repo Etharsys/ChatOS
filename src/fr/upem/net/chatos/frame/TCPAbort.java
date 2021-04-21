@@ -6,7 +6,7 @@ import java.util.logging.Logger;
 
 import fr.upem.net.chatos.reader.OpCodeReader;
 
-public class TCPAbort extends AbstractTCPDatagram{
+public class TCPAbort extends AbstractTCPFrame{
 
 	/**
 	 * TCPAbort constructor : packet TCPAbort datagram

@@ -5,7 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.logging.Logger;
 
-abstract class AbstractTCPDatagram implements TCPFrame{
+abstract class AbstractTCPFrame implements TCPFrame{
 	private final String sender;
 	private final String recipient;
 	private final short  password;
@@ -16,7 +16,7 @@ abstract class AbstractTCPDatagram implements TCPFrame{
 	 * @param recipient pseudo of the recipient TCP request
 	 * @param password password of this TCP connexion
 	 */
-	AbstractTCPDatagram(String sender, String recipient, short password) {
+	AbstractTCPFrame(String sender, String recipient, short password) {
 		Objects.requireNonNull(sender);
 		Objects.requireNonNull(recipient);
 		this.sender = sender;

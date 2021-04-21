@@ -11,7 +11,7 @@ abstract class AbstractTCPFrame implements TCPFrame{
 	private final short  password;
 	
 	/**
-	 * AbstractTCPDatagram Constructor : super class for datagrams requests
+	 * AbstractTCPFrame Constructor : super class for frames requests
 	 * @param sender pseudo of the sender TCP request
 	 * @param recipient pseudo of the recipient TCP request
 	 * @param password password of this TCP connexion

@@ -81,8 +81,14 @@ class TCPContext implements Context {
      * 
 	 * @brief silently close the socket channel
 	 */
+    @Override
     public void silentlyClose() {
-        try {
+        close();
+        pairedContext.ifPresent(c->c.close());
+    }
+    
+    private void close() {
+    	try {
             socketChannel.close();
         } catch (IOException e) {
             // ignore exception

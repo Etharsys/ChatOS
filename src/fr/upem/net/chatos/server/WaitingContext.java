@@ -264,7 +264,8 @@ class WaitingContext implements Context {
      * 
 	 * @brief silently close the socket channel
 	 */
-    private void silentlyClose() {
+    @Override
+    public void silentlyClose() {
         try {
             sc.close();
         } catch (IOException e) {

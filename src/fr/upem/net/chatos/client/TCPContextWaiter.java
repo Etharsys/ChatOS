@@ -78,9 +78,9 @@ class TCPContextWaiter implements TCPContext{
 			if (err.getErrorCode() != ErrorCode.OK) {
 				closed = true;
 			} else {
-				var context = new TCPHTTPContext(contextKey,socket,commandQueue, targetQueue);
+				var context = new TCPHTTPContext(contextKey,socket,commandQueue, targetQueue, client, recipient);
 				contextKey.attach(context);
-				client.putContextInContextQueue(recipient, context);
+				client.putContextInContextMap(recipient, context);
 				System.out.println("Connection TCP with " + recipient + " enabled");
 			}
 		}

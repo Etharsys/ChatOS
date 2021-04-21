@@ -3,7 +3,6 @@ package fr.upem.net.chatos.server;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
-import java.nio.channels.Channel;
 import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -371,7 +370,7 @@ public class ChatOsServer {
 			}
 		} catch (IOException e) {
 			logger.log(Level.INFO,"Connection closed with client due to IOException",e);
-			silentlyClose(key);
+			((Context) key.attachment()).silentlyClose();
 			if (key.attachment() instanceof ChatContext) {
 				var login = ((ChatContext)key.attachment()).getLogin();
 				clientLoginMap.remove(login);
@@ -394,21 +393,6 @@ public class ChatOsServer {
 		sc.configureBlocking(false);
 		var newKey = sc.register(selector, SelectionKey.OP_READ);
 		newKey.attach(new WaitingContext(this,newKey));
-    }
-
-    /**
-     * 
-     * @brief silently close the socket channel
-     * @param key the server key
-     */
-    private void silentlyClose(SelectionKey key) {
-        Channel sc = (Channel) key.channel();
-        try {
-        	logger.info("key closed");
-            sc.close();
-        } catch (IOException e) {
-            // ignore exception
-        }
     }
 
     /**

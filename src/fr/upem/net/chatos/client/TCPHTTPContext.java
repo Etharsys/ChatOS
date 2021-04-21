@@ -41,6 +41,8 @@ class TCPHTTPContext implements TCPContext{
 	
 	private final SelectionKey key;
 	private final SocketChannel sc;
+	private final ChatOsClient client;
+	private final String recipient;
 	
 	private final ByteBuffer bbin  = ByteBuffer.allocate(BUFFER_SIZE);
 	private final ByteBuffer bbout = ByteBuffer.allocate(BUFFER_SIZE);
@@ -65,12 +67,14 @@ class TCPHTTPContext implements TCPContext{
 	 * @param socket the original socket channel
 	 * @param recipient the pseudonym of the TCP private connexion recipient
 	 */
-	public TCPHTTPContext(SelectionKey key, SocketChannel sc, Collection<String> commandQueue, Collection<String> targetQueue) {
+	public TCPHTTPContext(SelectionKey key, SocketChannel sc, Collection<String> commandQueue, Collection<String> targetQueue, ChatOsClient client, String recipient) {
 		logger.severe("Created TCP Context");
 		Objects.requireNonNull(key);
 		Objects.requireNonNull(sc);
 		Objects.requireNonNull(commandQueue);
 		Objects.requireNonNull(targetQueue);
+		Objects.requireNonNull(recipient);
+		Objects.requireNonNull(client);
 		if (targetQueue.size() != commandQueue.size()) {
 			throw new IllegalArgumentException("Size between queues are not the same");
 		}
@@ -78,6 +82,8 @@ class TCPHTTPContext implements TCPContext{
 		this.sc = sc;
 		this.commandQueue.addAll(commandQueue);
 		this.targetQueue.addAll(targetQueue);
+		this.client = client;
+		this.recipient = recipient;
 		updateInterestOps();
 	}
 
@@ -94,7 +100,8 @@ class TCPHTTPContext implements TCPContext{
 				|| (state == Status.SQ || state == Status.AN)){
 			intOps |= SelectionKey.OP_WRITE;
 		}
-		if (intOps == 0) {
+		if (intOps == 0 || !key.isValid()) {
+			System.out.println("TCP connection was interrupted");
 			silentlyClose();
 			return;
 		}
@@ -133,7 +140,7 @@ class TCPHTTPContext implements TCPContext{
 		case REFILL :
 			return;
 		case DONE :
-			HTTPanswer = stringReader.get(); // TODO file !
+			HTTPanswer = stringReader.get();
 			stringReader.reset();
 			System.out.println(HTTPanswer);
 			
@@ -243,6 +250,7 @@ class TCPHTTPContext implements TCPContext{
 	 * @brief silently close the socket channel
 	 */
 	private void silentlyClose() {
+		client.removeContextFromContextMap(recipient);
         try {
             sc.close();
         } catch (IOException e) {

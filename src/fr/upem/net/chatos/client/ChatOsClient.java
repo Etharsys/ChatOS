@@ -173,10 +173,17 @@ public class ChatOsClient {
 	 * @param recipient the recipient linked to the context
 	 * @param context the context to put in the map
 	 */
-	public void putContextInContextQueue(String recipient, TCPHTTPContext context) {
+	public void putContextInContextMap(String recipient, TCPHTTPContext context) {
 		Objects.requireNonNull(recipient);
 		Objects.requireNonNull(context);
 		TCPContextMap.put(recipient, context);
+	}
+	
+	public void removeContextFromContextMap(String recipient) {
+		Objects.requireNonNull(recipient);
+		if (TCPContextMap.remove(recipient) == null) {
+			throw new IllegalArgumentException(recipient + " is not in the map");
+		}
 	}
 	
 	/**
@@ -242,8 +249,6 @@ public class ChatOsClient {
 						TCPContextMap.get(recipient).queueCommand(type[1], type[2]);
 						return;
 					} else{
-						//TODO TCPWAITING
-						//TODO random short & save it
 						var request = new TCPAsk(login, recipient,(short) random.nextInt(Short.MAX_VALUE));
 						if (!TCPContextMap.containsKey(recipient)) {
 							initiateTCPProtocole(request, type[1], type[2]);
@@ -493,5 +498,4 @@ public class ChatOsClient {
 		if (key.isWritable())   list.add("WRITE");
 		return String.join(" and ",list);
 	}
-	
 }

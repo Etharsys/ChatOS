@@ -15,4 +15,9 @@ interface Context {
 		 * @throws IOException when write throws it
 		 */
 		void doWrite() throws IOException;
+		
+		/**
+		 * @brief Close a context
+		 */
+		void silentlyClose();
 }

@@ -6,7 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
 
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -14,13 +13,13 @@ import org.junit.jupiter.api.Test;
 import fr.upem.net.chatos.reader.ConnectionRequestReader;
 import fr.upem.net.chatos.reader.DatagramVisitor;
 import fr.upem.net.chatos.reader.ErrorCodeReader;
+import fr.upem.net.chatos.reader.Reader.ProcessStatus;
 import fr.upem.net.chatos.reader.SendMessageAllReader;
 import fr.upem.net.chatos.reader.SendPrivateMessageReader;
 import fr.upem.net.chatos.reader.TCPAbortReader;
 import fr.upem.net.chatos.reader.TCPAcceptReader;
 import fr.upem.net.chatos.reader.TCPAskReader;
 import fr.upem.net.chatos.reader.TCPConnectReader;
-import fr.upem.net.chatos.reader.Reader.ProcessStatus;
 
 public class SendPrivateMessageReaderTest {
 	private static final Charset UTF_8 = StandardCharsets.UTF_8;

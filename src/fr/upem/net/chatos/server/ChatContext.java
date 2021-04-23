@@ -42,64 +42,48 @@ class ChatContext implements Context {
 
     	@Override
     	public void visit(ConnectionRequestReader reader, ChatContext context) {
-    		Objects.requireNonNull(reader);
-    		Objects.requireNonNull(context);
     		logger.info("Received ConnectionRequest");
     		context.queueFrame(new ErrorCode(ErrorCode.ALREADY_CONNECTED));
     	}
 
     	@Override
     	public void visit(SendPrivateMessageReader reader, ChatContext context) {
-    		Objects.requireNonNull(reader);
-    		Objects.requireNonNull(context);
     		logger.info("Received PrivateMessage");
     		context.broadcast(reader.get());
     	}
 
     	@Override
     	public void visit(SendMessageAllReader reader, ChatContext context) {
-    		Objects.requireNonNull(reader);
-    		Objects.requireNonNull(context);
     		logger.info("Received MessageAll");
     		context.broadcast(reader.get());
     	}
 
     	@Override
     	public void visit(ErrorCodeReader reader, ChatContext context) {
-    		Objects.requireNonNull(reader);
-    		Objects.requireNonNull(context);
     		logger.info("Received ErrorCode");
     		//Do nothing
     	}
 
     	@Override
     	public void visit(TCPAskReader reader, ChatContext context) {
-    		Objects.requireNonNull(reader);
-    		Objects.requireNonNull(context);
     		logger.info("Received TCPAsk");
     		context.broadcast(reader.get());
     	}
 
     	@Override
     	public void visit(TCPAbortReader reader, ChatContext context) {
-    		Objects.requireNonNull(reader);
-    		Objects.requireNonNull(context);
     		logger.info("Received TCPAbort");
     		context.broadcast(reader.get());
     	}
 
     	@Override
     	public void visit(TCPConnectReader reader, ChatContext context) {
-    		Objects.requireNonNull(reader);
-    		Objects.requireNonNull(context);
     		logger.info("Received TCPConnect");
     		context.queueFrame(new ErrorCode(ErrorCode.TCP_NOT_IN_PROTOCOLE));
     	}
 
     	@Override
     	public void visit(TCPAcceptReader reader, ChatContext context) {
-    		Objects.requireNonNull(reader);
-    		Objects.requireNonNull(context);
     		logger.info("Received TCPAccept");
     		context.queueFrame(new ErrorCode(ErrorCode.TCP_NOT_IN_PROTOCOLE));
     	}

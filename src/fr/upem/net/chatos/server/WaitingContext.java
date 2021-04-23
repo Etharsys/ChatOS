@@ -40,7 +40,6 @@ class WaitingContext implements Context {
     
     final private OpCodeReader reader  = new OpCodeReader();
     
-    //TODO Ca me parrait pas si mal au final mais c'est pas le meilleur truc je pense
     private boolean done;
         
     public WaitingContext(ChatOsServer server, SelectionKey key){

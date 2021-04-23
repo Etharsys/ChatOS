@@ -23,7 +23,7 @@ public class ConnectionRequest implements Frame {
 	public Optional<ByteBuffer> toByteBuffer(Logger logger) {
 		var bblog = UTF8_CHARSET.encode(pseudo);
 		if (bblog.limit() > 1024) {
-			System.out.println("Pseudo is too long");
+			logger.info("Pseudo is too long");
 			return Optional.empty();
 		}
 		return Optional.of(ByteBuffer.allocate(1 + Short.BYTES + bblog.limit())

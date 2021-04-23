@@ -35,7 +35,6 @@ public class HTTPReader implements Reader<HTTPFrame> {
 			throw new IllegalStateException();
 		}
 		if (state == State.WAITING_HEADER) {
-			//System.out.println(ASCII.decode(bb));
 			var ps = headerReader.process(bb);
 			switch(ps) {
 		        case REFILL:

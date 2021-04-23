@@ -24,7 +24,6 @@ public class CRLFReader implements Reader<String> {
 	@Override
 	public ProcessStatus process(ByteBuffer bb) {
 		if (state == State.DONE || state == State.ERROR) {
-			System.out.println(state);
 			throw new IllegalStateException();
 		}
 		if (!internalbb.hasRemaining()) {

@@ -4,19 +4,15 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
-import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.Random;
 import java.util.Scanner;
-import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.logging.Logger;
 
@@ -373,7 +369,7 @@ public class ChatOsClient {
 		console.start();
 		
 		while (!Thread.interrupted()) {
-			printKeys();
+//			printKeys();
 			try {
 				selector.select(this::treatKey);
 				processCommands();
@@ -388,7 +384,7 @@ public class ChatOsClient {
 	 * @param key the key to check to change the context status
 	 */
 	private void treatKey(SelectionKey key) {
-		printSelectedKey(key);
+//		printSelectedKey(key);
 		
         try {
             if (key.isValid() && key.isWritable()) {
@@ -434,89 +430,89 @@ public class ChatOsClient {
 		System.out.println("Usage : ClientChatOs login hostname port");
 	}
 	
-	/**
-	 * 
-	 * @brief get a string format of a key
-	 * @param key the key to parse in a string
-	 * @return the string key
-	 */
-	private String interestOpsToString(SelectionKey key){
-		if (!key.isValid()) {
-			return "CANCELLED";
-		}
-		int interestOps = key.interestOps();
-		ArrayList<String> list = new ArrayList<>();
-		if ((interestOps&SelectionKey.OP_ACCEPT)!=0) list.add("OP_ACCEPT");
-		if ((interestOps&SelectionKey.OP_READ)!=0)   list.add("OP_READ");
-		if ((interestOps&SelectionKey.OP_WRITE)!=0)  list.add("OP_WRITE");
-		return String.join("|",list);
-	}
-
-	/**
-	 * 
-	 * @brief print the client selectionned keys 
-	 */
-	public void printKeys() {
-		Set<SelectionKey> selectionKeySet = selector.keys();
-		if (selectionKeySet.isEmpty()) {
-			System.out.println("The selector contains no key : this should not happen!");
-			return;
-		}
-		System.out.println("The selector contains:");
-		for (SelectionKey key : selectionKeySet){
-			SelectableChannel channel = key.channel();
-			if (channel instanceof ServerSocketChannel) {
-				System.out.println("\tKey for ServerSocketChannel : "+ interestOpsToString(key));
-			} else {
-				SocketChannel sc = (SocketChannel) channel;
-				System.out.println("\tKey for Client "+ remoteAddressToString(sc) +" : "+ interestOpsToString(key));
-			}
-		}
-	}
-
-	/**
-	 * 
-	 * @brief get a string format of the remote address of a socket channel
-	 * @param sc the interested socket channel
-	 * @return the string format of the remote address
-	 */
-	private String remoteAddressToString(SocketChannel sc) {
-		try {
-			return sc.getRemoteAddress().toString();
-		} catch (IOException e){
-			return "???";
-		}
-	}
-
-	/**
-	 * 
-	 * @brief print a selected key
-	 * @param key the key to print
-	 */
-	public void printSelectedKey(SelectionKey key) {
-		SelectableChannel channel = key.channel();
-		if (channel instanceof ServerSocketChannel) {
-			System.out.println("\tServerSocketChannel can perform : " + possibleActionsToString(key));
-		} else {
-			SocketChannel sc = (SocketChannel) channel;
-			System.out.println("\tClient " + remoteAddressToString(sc) + " can perform : " + possibleActionsToString(key));
-		}
-	}
-
-	/**
-	 * 
-	 * @brief print the possible channel of a key
-	 * @param key the key to examined
-	 * @return a string format of possible actions
-	 */
-	private String possibleActionsToString(SelectionKey key) {
-		if (!key.isValid()) {
-			return "CANCELLED";
-		}
-		ArrayList<String> list = new ArrayList<>();
-		if (key.isAcceptable()) list.add("ACCEPT");
-		if (key.isReadable())   list.add("READ");
-		if (key.isWritable())   list.add("WRITE");
-		return String.join(" and ",list);
-	}
+//	/**
+//	 * 
+//	 * @brief get a string format of a key
+//	 * @param key the key to parse in a string
+//	 * @return the string key
+//	 */
+//	private String interestOpsToString(SelectionKey key){
+//		if (!key.isValid()) {
+//			return "CANCELLED";
+//		}
+//		int interestOps = key.interestOps();
+//		ArrayList<String> list = new ArrayList<>();
+//		if ((interestOps&SelectionKey.OP_ACCEPT)!=0) list.add("OP_ACCEPT");
+//		if ((interestOps&SelectionKey.OP_READ)!=0)   list.add("OP_READ");
+//		if ((interestOps&SelectionKey.OP_WRITE)!=0)  list.add("OP_WRITE");
+//		return String.join("|",list);
+//	}
+//
+//	/**
+//	 * 
+//	 * @brief print the client selectionned keys 
+//	 */
+//	public void printKeys() {
+//		Set<SelectionKey> selectionKeySet = selector.keys();
+//		if (selectionKeySet.isEmpty()) {
+//			System.out.println("The selector contains no key : this should not happen!");
+//			return;
+//		}
+//		System.out.println("The selector contains:");
+//		for (SelectionKey key : selectionKeySet){
+//			SelectableChannel channel = key.channel();
+//			if (channel instanceof ServerSocketChannel) {
+//				System.out.println("\tKey for ServerSocketChannel : "+ interestOpsToString(key));
+//			} else {
+//				SocketChannel sc = (SocketChannel) channel;
+//				System.out.println("\tKey for Client "+ remoteAddressToString(sc) +" : "+ interestOpsToString(key));
+//			}
+//		}
+//	}
+//
+//	/**
+//	 * 
+//	 * @brief get a string format of the remote address of a socket channel
+//	 * @param sc the interested socket channel
+//	 * @return the string format of the remote address
+//	 */
+//	private String remoteAddressToString(SocketChannel sc) {
+//		try {
+//			return sc.getRemoteAddress().toString();
+//		} catch (IOException e){
+//			return "???";
+//		}
+//	}
+//
+//	/**
+//	 * 
+//	 * @brief print a selected key
+//	 * @param key the key to print
+//	 */
+//	public void printSelectedKey(SelectionKey key) {
+//		SelectableChannel channel = key.channel();
+//		if (channel instanceof ServerSocketChannel) {
+//			System.out.println("\tServerSocketChannel can perform : " + possibleActionsToString(key));
+//		} else {
+//			SocketChannel sc = (SocketChannel) channel;
+//			System.out.println("\tClient " + remoteAddressToString(sc) + " can perform : " + possibleActionsToString(key));
+//		}
+//	}
+//
+//	/**
+//	 * 
+//	 * @brief print the possible channel of a key
+//	 * @param key the key to examined
+//	 * @return a string format of possible actions
+//	 */
+//	private String possibleActionsToString(SelectionKey key) {
+//		if (!key.isValid()) {
+//			return "CANCELLED";
+//		}
+//		ArrayList<String> list = new ArrayList<>();
+//		if (key.isAcceptable()) list.add("ACCEPT");
+//		if (key.isReadable())   list.add("READ");
+//		if (key.isWritable())   list.add("WRITE");
+//		return String.join(" and ",list);
+//	}
 }

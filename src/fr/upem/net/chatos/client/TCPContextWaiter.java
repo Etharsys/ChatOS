@@ -74,7 +74,6 @@ class TCPContextWaiter implements TCPContext{
 				System.out.println("Didn't receive ErrorCode");
 			}
 			var err = new ErrorCode(bbin.get());
-			System.out.println("Received " + err);
 			if (err.getErrorCode() != ErrorCode.OK) {
 				closed = true;
 			} else {

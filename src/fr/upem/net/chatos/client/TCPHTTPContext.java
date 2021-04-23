@@ -68,7 +68,6 @@ class TCPHTTPContext implements TCPContext{
 	 * @param recipient the pseudonym of the TCP private connexion recipient
 	 */
 	public TCPHTTPContext(SelectionKey key, SocketChannel sc, Collection<String> commandQueue, Collection<String> targetQueue, ChatOsClient client, String recipient) {
-		logger.severe("Created TCP Context");
 		Objects.requireNonNull(key);
 		Objects.requireNonNull(sc);
 		Objects.requireNonNull(commandQueue);
@@ -113,7 +112,6 @@ class TCPHTTPContext implements TCPContext{
 	 * @brief process the command of bbin
 	 */
 	private void processIn() throws IOException {
-		logger.info("In " + state);
 		switch (state) {
 		case WQ :
 			state = Status.RQ;
@@ -142,7 +140,6 @@ class TCPHTTPContext implements TCPContext{
 		case DONE :
 			HTTPanswer = stringReader.get();
 			stringReader.reset();
-			System.out.println(HTTPanswer);
 			
 			try {				
 				fileLines = Files.readAllLines(Path.of(HTTPanswer), ASCII);
@@ -194,7 +191,6 @@ class TCPHTTPContext implements TCPContext{
 	 * @brief process the  content of bbout
 	 */
 	private void processOut() {
-		logger.info("Out " + state);
 		switch (state) {
 		case WQ :
 			state = Status.SQ;
@@ -225,9 +221,7 @@ class TCPHTTPContext implements TCPContext{
 	}
 	
 	private void processOutAnswer() {
-		logger.info("current line : " + currentLine + ", " + fileLines.size());
 		while (currentLine.hasRemaining() && bbout.hasRemaining()) {
-			logger.info(fileLines.size() + ";");
 			if (currentLine.remaining() <= bbout.remaining()) {
 				bbout.put(currentLine);
 			} else {
@@ -240,7 +234,6 @@ class TCPHTTPContext implements TCPContext{
 				state = Status.WQ;
 			} else {
 				var line = fileLines.remove(0);
-				logger.info(line + " : " + fileLines.size());
 				currentLine = ASCII.encode(line + "\n");
 			}
 		}

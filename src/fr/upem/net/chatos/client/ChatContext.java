@@ -97,22 +97,12 @@ class ChatContext implements Context {
 
 		@Override
 		public void visit(TCPAskReader reader, ChatContext context) {
-			TCPAsk tcpAsk = reader.get();
-			System.out.println("Received a TCPAsk with the arguments : ");
-			System.out.println("Sender    : " + tcpAsk.getSender());
-			System.out.println("Recipient : " + tcpAsk.getRecipient());
-			System.out.println("Password  : " + tcpAsk.getPassword());
-			context.treatTCPAsk(tcpAsk);
+			context.treatTCPAsk(reader.get());
 		}
 
 		@Override
 		public void visit(TCPAbortReader reader, ChatContext context) {
-			TCPAbort tcpAbort = reader.get();
-			System.out.println("Received a TCPAbort with the arguments : ");
-			System.out.println("Sender    : " + tcpAbort.getSender());
-			System.out.println("Recipient : " + tcpAbort.getRecipient());
-			System.out.println("Password  : " + tcpAbort.getPassword());
-			context.treatTCPAbort(tcpAbort);
+			context.treatTCPAbort(reader.get());
 		}
 
 		@Override
@@ -123,12 +113,7 @@ class ChatContext implements Context {
 
 		@Override
 		public void visit(TCPAcceptReader reader, ChatContext context) {
-			TCPAccept tcpAccept = reader.get();
-			System.out.println("Received a TCPAccept with the arguments : ");
-			System.out.println("Sender    : " + tcpAccept.getSender());
-			System.out.println("Recipient : " + tcpAccept.getRecipient());
-			System.out.println("Password  : " + tcpAccept.getPassword());
-			context.treatTCPAccept(tcpAccept);
+			context.treatTCPAccept(reader.get());
 		}
 	};
 
@@ -221,7 +206,6 @@ class ChatContext implements Context {
 
 	@Override
 	public void doRead() throws IOException {
-		System.out.println("Reading...");
 		if (sc.read(bbin) == -1) {
 			closed = true;
 		}

@@ -377,6 +377,15 @@ public class ChatOsServer {
 			}
 		}
 	}
+    
+    /**
+     * 
+     * @brief remove a login from the client login container
+     * @param login the login to remove
+     */
+    void removeLogin(String login) {
+    	clientLoginMap.remove(login);
+    }
 
     /**
      * 

@@ -225,6 +225,7 @@ class ChatContext implements Context {
 	 */
     @Override
     public void silentlyClose() {
+    	server.removeLogin(login);
         try {
             sc.close();
         } catch (IOException e) {

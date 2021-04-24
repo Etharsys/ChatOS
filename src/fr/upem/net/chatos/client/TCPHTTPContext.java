@@ -170,11 +170,13 @@ class TCPHTTPContext implements TCPContext{
 			break;
 		case DONE :
 			var header = httpreader.get().getHeader();
-			if (header.getResponce_code().equals("200 OK")) {				
+			if (header.getResponce_code().equals("200 OK")) {
+				var name = targetQueue.poll();
+				System.out.println("Received HTTP answer for : " + name);
 				if (header.getContent_type().equals("text")) {
-					System.out.println("HTTP GET result from the TCP connexion : \n" + httpreader.get().getContent());					
+					System.out.println(httpreader.get().getContent());					
 				}
-				try (var bw = Files.newBufferedWriter(Path.of(targetQueue.poll()), ASCII, StandardOpenOption.WRITE,
+				try (var bw = Files.newBufferedWriter(Path.of(name), ASCII, StandardOpenOption.WRITE,
 						StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING)) {
 					bw.write(httpreader.get().getContent());
 				}

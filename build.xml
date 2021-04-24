@@ -153,7 +153,7 @@
         </junitreport>
     </target>
 	<property name="src.dir" value="src"/>
-    <property name="jar.dir" value="jar"/>
+    <property name="jar.dir" value="ant-jar"/>
 	<property name="doc.dir" value="doc/javadoc"/>
 	<property name="build.dir" value="bin"/>
 
